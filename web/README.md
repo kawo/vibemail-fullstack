@@ -1,6 +1,6 @@
 # VibeMail Glass
 
-The VibeMail frontend: a glassmorphic mail client for the VibeMail Engine. It implements the behavioural spec in [`docs/DESIGN_SPEC.md`](../docs/DESIGN_SPEC.md) against the API in [`CONTRACT.md`](../CONTRACT.md).
+The VibeMail frontend: a glassmorphic mail client for the VibeMail Engine. It implements the behavioural spec in [`docs/design-system/DESIGN_SPEC.md`](../docs/design-system/DESIGN_SPEC.md) against the API in [`CONTRACT.md`](../CONTRACT.md).
 
 Built with Vite, React and TypeScript. It has no router or state library: a small history router (`src/router.ts`) and one message cache (`src/state/store.ts`) are enough.
 

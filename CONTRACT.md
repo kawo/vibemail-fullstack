@@ -1,7 +1,7 @@
 # VibeMail Engine — Contract
 
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
-> **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts. They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
+> **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts. They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
 > Stack: Vercel Functions (Node.js runtime, `api/` directory, no framework) · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
