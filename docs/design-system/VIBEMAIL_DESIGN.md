@@ -2,17 +2,17 @@
 version: alpha
 name: OpenCode-design-analysis
 description: |
-  A terminal-native marketing system rendered entirely in JetBrains Mono — every word on the page, from the hero headline down to the footer fine print, is monospaced. The page itself reads like a manpage or a static-site README: deep blue-black canvas (`#050810`), nearly-black ink (`#201d1d`), 4px-radius rectangles for the few interactive elements, and bracketed `[+]`/`[-]` ASCII markers used as bullets. Surfaces are glassmorphic: translucent white fills at 8–12% opacity, backdrop blur from 20px to 40px that strengthens with elevation, thin 15–20% white borders, and soft drop shadows. The brand's main "visual moment" is a single glass hero card, set over the elevated background (`#0a0f1e`), that mocks up the OpenCode TUI itself — monospaced terminal output, ASCII pipe characters, and a wordmark rendered as block-pixel ASCII. Every section sits as a hairline-bordered text block on the canvas with no gradients, no decorative imagery, and no non-monospaced character anywhere in the system.
+  A terminal-native marketing system rendered entirely in JetBrains Mono — every word on the page, from the hero headline down to the footer fine print, is monospaced. The page itself reads like a manpage or a static-site README: deep blue-black canvas (`#050810`), near-white ink (`#f8f7f7`), 4px-radius rectangles for the few interactive elements, and bracketed `[+]`/`[-]` ASCII markers used as bullets. Surfaces are glassmorphic: translucent white fills at 8–12% opacity, backdrop blur from 20px to 40px that strengthens with elevation, thin 15–20% white borders, and soft drop shadows. The brand's main "visual moment" is a single glass hero card, set over the elevated background (`#0a0f1e`), that mocks up the OpenCode TUI itself — monospaced terminal output, ASCII pipe characters, and a wordmark rendered as block-pixel ASCII. Every section sits as a hairline-bordered text block on the canvas with no gradients, no decorative imagery, and no non-monospaced character anywhere in the system.
 
 colors:
-  primary: "#201d1d"
-  on-primary: "#fdfcfc"
-  ink: "#201d1d"
-  ink-deep: "#0f0000"
-  charcoal: "#302c2c"
-  body: "#424245"
-  mute: "#646262"
-  stone: "#6e6e73"
+  primary: "#fdfcfc"
+  on-primary: "#201d1d"
+  ink: "#f8f7f7"
+  ink-deep: "#dcd8d8"
+  charcoal: "#e8e5e5"
+  body: "#d2d2d7"
+  mute: "#bdbbbb"
+  stone: "#aeadb2"
   ash: "#9a9898"
   canvas: "#050810"
   surface-soft: "rgba(255,255,255,0.08)"
@@ -257,7 +257,7 @@ Adapted from OpenCode DESIGN.md for VibeMail Glass. Surface treatment replaced w
 
 This system is rendered entirely in JetBrains Mono — every word on the page, from the 38px hero headline down to the 14px footer fine print, sits in the same monospaced face. The visual identity comes from that single typographic decision: the page reads like a manpage or a static-site README, complete with bracketed `[+]` / `[-]` / `[x]` ASCII markers used in place of icons or bullets, and a wordmark rendered as block-pixel ASCII art at the top of the nav. There is no sans-serif anywhere, no display face, no italics, no decorative ornament — the system is one font and one weight away from being a 1990s `whatis` page rendered at modern resolutions.
 
-The chrome is austere: deep blue-black canvas (`{colors.canvas}` — `#050810`), nearly-black ink (`{colors.ink}` — `#201d1d`), and a 4-tier neutral gray ladder for body, metadata, and disabled text. Raised elements are glass panes: translucent white fills (8–12%), backdrop blur that strengthens with elevation (20px → 40px), a thin 15–20% white border, and a soft drop shadow. Sections are hairline-bordered text blocks (`{colors.hairline}` 1px) sitting directly on the canvas with `{spacing.section}` (96px) air between them. The single "visual" moment in the entire system is a full-bleed glass hero card over the elevated background (`{colors.surface-dark}` — `#0a0f1e`) that mocks up the OpenCode TUI itself: a terminal frame with `tab` / `ctrl-p` keybinding hints, a "Build" command line, and the OpenCode wordmark rendered as a pixel-block ASCII title.
+The chrome is austere: deep blue-black canvas (`{colors.canvas}` — `#050810`), near-white ink (`{colors.ink}` — `#f8f7f7`), and a 4-tier neutral gray ladder for body, metadata, and disabled text. Raised elements are glass panes: translucent white fills (8–12%), backdrop blur that strengthens with elevation (20px → 40px), a thin 15–20% white border, and a soft drop shadow. Sections are hairline-bordered text blocks (`{colors.hairline}` 1px) sitting directly on the canvas with `{spacing.section}` (96px) air between them. The single "visual" moment in the entire system is a full-bleed glass hero card over the elevated background (`{colors.surface-dark}` — `#0a0f1e`) that mocks up the OpenCode TUI itself: a terminal frame with `tab` / `ctrl-p` keybinding hints, a "Build" command line, and the OpenCode wordmark rendered as a pixel-block ASCII title.
 
 The semantic palette is unusual for a brand-marketing site: it ships the full Apple Human Interface Guidelines accent ramp — `{colors.accent}` (Apple Blue `#007aff`), `{colors.danger}` (`#ff3b30`), `{colors.warning}` (`#ff9f0a`), `{colors.success}` (`#30d158`) plus their hover/active deepenings — even though the marketing surfaces themselves only use these colors in the hero TUI mockup as syntax-highlight stand-ins. The wider palette belongs to the in-product TUI; the marketing pages mostly stay in monochrome.
 
@@ -276,9 +276,10 @@ The semantic palette is unusual for a brand-marketing site: it ships the full Ap
 > **Source pages:** `/` (home), `/zen`, `/enterprise`. The chrome palette is identical across all three.
 
 ### Brand & Accent
-- **Ink** (`{colors.primary}` / `{colors.ink}` — `#201d1d`): the brand's only "color." Headlines, body text, primary CTA fill, nav links, and every solid icon. Treats nearly-black as the brand color rather than pure black.
-- **Ink Deep** (`{colors.ink-deep}` — `#0f0000`): pressed-state for the primary CTA. Carries a faint red undertone.
-- **Cream** (`{colors.on-primary}` — `#fdfcfc`): the brand's signature warm white. Used for the on-primary text color and the ASCII wordmark fill on dark.
+- **Primary** (`{colors.primary}` — `#fdfcfc`): the primary CTA fill, the brand's signature warm white. A light fill is the one solid shape that stands out against the dark canvas and the glass.
+- **Ink** (`{colors.ink}` — `#f8f7f7`): the brand's text "color." Headlines, body text, nav links, and every solid icon. Near-white rather than pure white, mirroring the primary fill.
+- **Ink Deep** (`{colors.ink-deep}` — `#dcd8d8`): pressed-state for the primary CTA. One step dimmer than the primary fill, keeping its warm cast.
+- **On Primary** (`{colors.on-primary}` — `#201d1d`): near-black label text on the primary CTA fill.
 
 ### Surface
 - **Canvas** (`{colors.canvas}` — `#050810`): base background for every page body.
@@ -290,11 +291,11 @@ The semantic palette is unusual for a brand-marketing site: it ships the full Ap
 - **Hairline Strong** (`{colors.hairline-strong}` — `rgba(255,255,255,0.20)`): tab strip's bottom rule, stronger inline divider, and the border on level-3 glass.
 
 ### Text
-- **Ink** (`{colors.ink}` — `#201d1d`): headlines, body text, primary nav links, button text on light surfaces.
-- **Charcoal** (`{colors.charcoal}` — `#302c2c`): subtly softer body where pure ink is too heavy.
-- **Body** (`{colors.body}` — `#424245`): default paragraph text and FAQ answers.
-- **Mute** (`{colors.mute}` — `#646262`): tab labels (default state), metadata, footer link text, in-list secondary annotations.
-- **Stone** (`{colors.stone}` — `#6e6e73`): least-emphasis utility text, breadcrumb separators.
+- **Ink** (`{colors.ink}` — `#f8f7f7`): headlines, body text, primary nav links, button text on glass surfaces.
+- **Charcoal** (`{colors.charcoal}` — `#e8e5e5`): subtly softer body where pure ink is too heavy.
+- **Body** (`{colors.body}` — `#d2d2d7`): default paragraph text and FAQ answers.
+- **Mute** (`{colors.mute}` — `#bdbbbb`): tab labels (default state), metadata, footer link text, in-list secondary annotations.
+- **Stone** (`{colors.stone}` — `#aeadb2`): least-emphasis utility text, breadcrumb separators.
 - **Ash** (`{colors.ash}` — `#9a9898`): disabled text and secondary annotation in dark TUI mockup, also TUI mockup secondary color.
 
 ### Semantic
@@ -402,7 +403,7 @@ There is no photography. Visual elements are limited to:
 **`button-primary`** — the universal OpenCode CTA
 - Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button-md}`, padding `4px 20px`, height ~36px, rounded `{rounded.sm}` (4px).
 - Used for "Download" (top nav), "Get started with Zen", "Send" (enterprise contact form), "Subscribe" (newsletter footer), "Read docs →".
-- Pressed state lives in `button-primary-active` — background drops to `{colors.ink-deep}`.
+- Pressed state lives in `button-primary-active` — background dims to `{colors.ink-deep}`.
 
 **`button-secondary`** — outlined alternative
 - Level-1 glass: background `{colors.surface-soft}` (8% white), `blur(20px)`, 1px solid `{colors.hairline}` border, soft level-1 shadow; text `{colors.ink}`, type `{typography.button-md}`, padding `4px 20px`, rounded `{rounded.sm}`.
@@ -525,7 +526,7 @@ There is no photography. Visual elements are limited to:
 All interactive elements meet WCAG AA at the ~36–40px height range. `{component.button-primary}` sits at ~36px with 20px horizontal padding. `{component.text-input}` and `{component.textarea}` sit at ~40px. `{component.button-tab}` rows in the install-method strip sit at ~32–36px depending on label length but extend to a full 44px tappable cell via inline padding. Footer links use `{typography.caption-md}` (14px) but receive ~28px line-height (caption-md is 2.0) plus 8px vertical padding for a comfortable ~44px tappable row.
 
 ### Collapsing Strategy
-- **Primary nav:** desktop horizontal cluster → tablet-narrow hamburger drawer at 768px. The dark "Download" CTA stays visible at all widths.
+- **Primary nav:** desktop horizontal cluster → tablet-narrow hamburger drawer at 768px. The light "Download" CTA stays visible at all widths.
 - **Hero TUI mockup:** maintains its full-bleed glass surface at every breakpoint; the ASCII wordmark scales proportionally and the keybinding-hint row may wrap to two lines on narrow screens.
 - **Install snippet + tab strip:** desktop fixed-width pill → mobile full-width pill with horizontal scroll on the tab strip if labels overflow.
 - **Footer:** 5-up horizontal link grid → 2-up at tablet → 1-up at mobile (each link becomes a full-width row).
