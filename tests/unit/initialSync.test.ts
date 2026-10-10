@@ -133,3 +133,13 @@ describe('toMessageRow', () => {
     });
   });
 });
+
+describe('runInitialSync: drafts (CONTRACT.md §3.5, v1.1)', () => {
+  it('never stores a message labelled DRAFT', async () => {
+    const { deps, box, messages } = setup(2);
+    box.messages.set('d1', fakeMessage({ id: 'd1', labels: ['INBOX', 'DRAFT'], receivedAt: new Date(Date.UTC(2026, 1, 1)) }));
+    const result = await runInitialSync(deps, USER);
+    expect(result).toMatchObject({ stored: 2, skipped: 1 });
+    expect(messages.forUser(USER).map((r) => r.gmail_id).sort()).toEqual(['m0', 'm1']);
+  });
+});

@@ -3,7 +3,7 @@ import type { UsersRepository } from '../db/users';
 import { ApiError } from '../middleware/errors';
 import { type MessageDTO, toMessageDTO } from './dto';
 
-/** Message list read side, CONTRACT.md §4.2. Reads the DB only; never calls Gmail. */
+/** Message list read side, CONTRACT.md §4.2: every stored message (v1.1). Reads the DB only; never calls Gmail. */
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
@@ -65,7 +65,7 @@ export async function listMessages(
     throw new ApiError('GMAIL_NOT_CONNECTED', 'Gmail is not connected');
   }
   // Fetch one extra row to know whether another page exists.
-  const rows = await deps.messages.listInbox(userId, query.limit + 1, query.cursor);
+  const rows = await deps.messages.listMessages(userId, query.limit + 1, query.cursor);
   const page = rows.slice(0, query.limit);
   const last = page[page.length - 1];
   const lastSyncedAt = await deps.users.getLastSyncedAt(userId);

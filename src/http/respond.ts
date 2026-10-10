@@ -79,7 +79,7 @@ export function preflightResponse(frontendUrl: string | undefined): Response {
     status: 204,
     headers: {
       ...corsHeaders(frontendUrl),
-      'Access-Control-Allow-Methods': 'GET, POST',
+      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE',
       'Access-Control-Allow-Headers': 'Authorization, Content-Type',
       'Access-Control-Max-Age': '600',
     },

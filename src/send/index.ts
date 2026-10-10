@@ -21,12 +21,12 @@ export interface SendDeps {
   log?: (message: string, error: unknown) => void;
 }
 
-const MAX_RECIPIENTS = 100;
-const MAX_SUBJECT = 998;
+export const MAX_RECIPIENTS = 100;
+export const MAX_SUBJECT = 998;
 const ADDR_SPEC = /^[^\s@<>",;:\\]+@[^\s@<>",;:\\]+\.[^\s@<>",;:\\]+$/;
 const NAME_ADDR = /^(?:"[^"\r\n]*"|[^<>"\r\n]*?)\s*<([^<>\s]+)>$/;
-const THREAD_ID = /^[A-Za-z0-9]+$/;
-const CR_LF = /[\r\n]/;
+export const THREAD_ID = /^[A-Za-z0-9]+$/;
+export const CR_LF = /[\r\n]/;
 
 export function isValidAddress(value: string): boolean {
   if (CR_LF.test(value)) {

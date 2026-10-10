@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProviderMessage } from '../providers/provider';
 import type { AttachmentMeta, Database, MessageRow } from '../types';
+import { deriveStatus } from './status';
 import { DatabaseError } from './users';
 
 /**
@@ -37,6 +38,7 @@ export function toMessageRow(userId: string, message: ProviderMessage, syncedAt:
     gmail_id: message.id,
     thread_id: message.threadId,
     label_ids: message.labels,
+    status: deriveStatus(message.labels),
     is_read: message.isRead,
     is_starred: message.isStarred,
     snippet: message.snippet,
@@ -60,8 +62,15 @@ export function toMessageRow(userId: string, message: ProviderMessage, syncedAt:
 }
 
 export interface MessagesRepository {
-  /** INBOX rows, newest first, strictly after `after`. Returns at most `limit` rows. */
-  listInbox(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]>;
+  /** Every stored row, newest first, strictly after `after`. Returns at most `limit` rows (CONTRACT.md §4.2). */
+  listMessages(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]>;
+  /** The newest `limit` rows of one thread, newest first (CONTRACT.md §4.8). */
+  listThread(userId: string, threadId: string, limit: number): Promise<MessageRow[]>;
+  /**
+   * Rows where every term appears, case-insensitively, in subject, from, any to address, snippet
+   * or plain body; newest first, strictly after `after` (CONTRACT.md §4.9).
+   */
+  searchMessages(userId: string, terms: string[], limit: number, after: ListCursor | null): Promise<MessageRow[]>;
   /** One stored message, or null. */
   getMessage(userId: string, gmailId: string): Promise<MessageRow | null>;
   /** Maps one normalized message (§5.1) and upserts it on `(user_id, gmail_id)`. Returns the written row. */
@@ -71,7 +80,7 @@ export interface MessagesRepository {
   deleteMessage(userId: string, gmailId: string): Promise<void>;
   /** Stored labels of one message, or null when it is not stored. */
   getLabels(userId: string, gmailId: string): Promise<string[] | null>;
-  /** Replaces a stored message's labels and the flags derived from them. */
+  /** Replaces a stored message's labels and the flags and `status` derived from them. */
   updateLabels(
     userId: string,
     gmailId: string,
@@ -96,8 +105,8 @@ export function createMessagesRepository(db: SupabaseClient<Database>): Messages
   }
 
   return {
-    async listInbox(userId, limit, after) {
-      let query = table().select('*').eq('user_id', userId).contains('label_ids', ['INBOX']);
+    async listMessages(userId, limit, after) {
+      let query = table().select('*').eq('user_id', userId);
       if (after) {
         // Values are an ISO timestamp and a Gmail ID: neither contains PostgREST filter syntax.
         query = query.or(
@@ -111,6 +120,37 @@ export function createMessagesRepository(db: SupabaseClient<Database>): Messages
         .overrideTypes<MessageRow[], { merge: false }>();
       if (error) {
         throw new DatabaseError('messages list', error);
+      }
+      return data ?? [];
+    },
+
+    async listThread(userId, threadId, limit) {
+      const { data, error } = await table()
+        .select('*')
+        .eq('user_id', userId)
+        .eq('thread_id', threadId)
+        .order('internal_date', { ascending: false })
+        .order('gmail_id', { ascending: false })
+        .limit(limit)
+        .overrideTypes<MessageRow[], { merge: false }>();
+      if (error) {
+        throw new DatabaseError('messages thread', error);
+      }
+      return data ?? [];
+    },
+
+    async searchMessages(userId, terms, limit, after) {
+      // search_messages() filters on p_user_id itself (migration, CONTRACT.md §5.3).
+      const { data, error } = await db
+        .rpc('search_messages', {
+          p_user_id: userId,
+          p_terms: terms,
+          p_limit: limit,
+          ...(after ? { p_before_date: after.internalDate, p_before_gmail_id: after.gmailId } : {}),
+        })
+        .overrideTypes<MessageRow[], { merge: false }>();
+      if (error) {
+        throw new DatabaseError('messages search', error);
       }
       return data ?? [];
     },
@@ -152,6 +192,7 @@ export function createMessagesRepository(db: SupabaseClient<Database>): Messages
       const { error } = await table()
         .update({
           label_ids: update.labels,
+          status: deriveStatus(update.labels),
           is_read: update.isRead,
           is_starred: update.isStarred,
           synced_at: update.syncedAt.toISOString(),

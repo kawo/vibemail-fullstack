@@ -1,13 +1,14 @@
 # VibeMail Engine — Contract
 
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
+> **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts. They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
 > Stack: Vercel Functions (Node.js runtime, `api/` directory, no framework) · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
 
 ## 1. Purpose & scope
 
-The VibeMail Engine is the backend that connects a user's Gmail account, mirrors their mail into Supabase, and exposes four user-facing endpoints (OAuth callback, message list, message send, mark as read) plus two machine-facing endpoints (the Gmail Pub/Sub webhook and the watch-renewal cron job).
+The VibeMail Engine is the backend that connects a user's Gmail account, mirrors their mail into Supabase, and exposes user-facing endpoints (Google sign-in, message list, send, mark as read and, from v1.1, label updates, thread view, search and drafts) plus two machine-facing endpoints (the Gmail Pub/Sub webhook and the watch-renewal cron job).
 
 **In scope (v1)**
 
@@ -16,16 +17,23 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
   - An initial full sync runs when the account is connected (§4.1).
   - Every later sync is triggered by a Gmail push notification (Pub/Sub webhook, §4.5).
 - Gmail `users.watch` registration at sign-in (§4.5) and daily renewal by a Vercel Cron Job (§4.6).
-- Listing INBOX messages from the DB with cursor pagination.
+- Listing stored messages from the DB with cursor pagination.
 - Sending new messages and replies (plain text and/or HTML).
 - Marking a single message as read.
+- *Added in v1.1:*
+  - a derived message `status` (§3.4);
+  - changing one message's labels: star, unstar, mark unread, archive, move to trash, restore (§4.7);
+  - a thread view and full-text search, both read from the DB only (§4.8, §4.9);
+  - creating, updating and deleting Gmail drafts (§4.10–§4.12).
+  - Filtering by label happens in the client, on `status`, `isStarred` and `labelIds`; there is no filter endpoint.
 
 **Out of scope (v1)**
 
 - Attachments on send (stored attachment *metadata* on received mail is in scope).
-- Label/unread filters, search, and thread-grouped views.
-- Scheduled jobs other than watch renewal. In particular, there is no scheduled or request-triggered sync: Gmail is read only at connect time and on push.
-- Mark as unread, archive, delete, and batch operations.
+- Server-side label/unread filters.
+- Scheduled jobs other than watch renewal. In particular, there is no scheduled or request-triggered sync: Gmail is read only at connect time and on push. The thread view and search read the DB only, so they see only stored messages.
+- Permanent delete, emptying the trash, and batch operations.
+- Listing or fetching drafts, and sending a draft by `draftId`.
 - Multiple Gmail accounts per user.
 
 ---
@@ -34,7 +42,7 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
 
 The project is complete when **every** item below is true and verifiable.
 
-1. All six routes exist at the exact paths in §4 and accept/return exactly the shapes defined there.
+1. Every route in §4 exists at its exact path and accepts/returns exactly the shapes defined there.
 2. Every `ErrorCode` listed in an endpoint's error table has at least one Jest test that triggers it and asserts the HTTP status and the error envelope from §3.3.
 3. `jest --ci --runInBand` passes (TypeScript via `ts-jest`, TypeScript pinned to 6.x because `ts-jest` does not support 7), including the integration tests in `tests/integration/`. They run against the **dev/test Supabase project** configured in `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`), with the `schema` branch's migration applied there, in the §6 Gate 1 worktree. They never run against production.
 4. `npm run typecheck` (`tsc -p tsconfig.check.json`, covering `src/`, `api/` and `tests/`) passes with `strict: true`, and lint passes with zero errors.
@@ -61,6 +69,11 @@ The project is complete when **every** item below is true and verifiable.
     - every repository function takes `userId` and its query filters on it (§5.3);
     - a token signed with the wrong secret, or with a different `alg`, is rejected.
 12. The sequencing rule in §6 was followed, and its gates are recorded in the PR descriptions.
+13. *Added in v1.1:*
+    - `status` is derived by the §3.4 rule on every write of `label_ids` (sync, send, mark as read, §4.7), with one test per value; no request body can set it.
+    - `GET /api/v1/threads/{threadId}` and `GET /api/v1/messages/search` make zero Gmail API calls (asserted as in criterion 6).
+    - `PATCH /api/v1/messages/{id}` routes `TRASH` changes to `messages.trash` / `messages.untrash` and every other change to `messages.modify`.
+    - The draft endpoints never accept a `draftId` in a request body; it comes only from the path.
 
 ---
 
@@ -104,7 +117,7 @@ The project is complete when **every** item below is true and verifiable.
 
 - **CORS.** Every `/api/v1` endpoint allows exactly one origin, `FRONTEND_URL`.
   - Responses carry `Access-Control-Allow-Origin: <FRONTEND_URL>` and `Vary: Origin`.
-  - `OPTIONS` preflights get `204`, with `Access-Control-Allow-Methods: GET, POST`, `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Max-Age: 600`.
+  - `OPTIONS` preflights get `204`, with `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE` (`PATCH` and `DELETE` added in v1.1), `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Max-Age: 600`.
   - No credentials are allowed: bearer endpoints use no cookies.
   - The webhook and cron endpoints send no CORS headers.
 - JSON request and response bodies use camelCase. DB columns use snake_case.
@@ -145,7 +158,7 @@ interface ErrorResponse {
 | `GMAIL_NOT_CONNECTED` | 409 | false | The user has no `users` row, no refresh token, or is missing the required scopes. |
 | `GMAIL_TOKEN_REVOKED` | 401 | false | Google rejected the refresh token (`invalid_grant`). The user must sign in again. |
 | `VALIDATION_FAILED` | 400 | false | The request params or body failed validation. |
-| `MESSAGE_NOT_FOUND` | 404 | false | The message ID is not in this user's mailbox (DB or Gmail). |
+| `MESSAGE_NOT_FOUND` | 404 | false | The message ID is not in this user's mailbox (DB or Gmail). From v1.1 it also covers a thread with no stored messages (§4.8) and a draft ID Gmail doesn't know (§4.11, §4.12); `details` then names `threadId` or `draftId`. |
 | `GMAIL_RATE_LIMITED` | 429 | true | Gmail returned 429 or a 403 `rateLimitExceeded`/`userRateLimitExceeded`. Sets the `Retry-After` header (seconds). |
 | `GMAIL_UPSTREAM_ERROR` | 502 | true | Gmail returned 5xx or an unexpected 4xx. |
 | `SYNC_FAILED` | 502 | true | Reserved. Webhook syncs run after the ack (§4.5), so their failures are logged, not returned. |
@@ -170,6 +183,7 @@ interface MessageDTO {
   gmailId: string;
   threadId: string;
   labelIds: string[];
+  status: MessageStatus;         // added in v1.1; derived, never client-set (see below)
   isRead: boolean;
   isStarred: boolean;
   snippet: string;
@@ -190,7 +204,19 @@ interface MessageDTO {
   attachments: AttachmentMeta[];
   syncedAt: string;              // ISO-8601
 }
+
+type MessageStatus = 'inbox' | 'sent' | 'archived' | 'trash' | 'spam';   // added in v1.1
 ```
+
+**`status` derivation** (*Added in v1.1*). `status` is computed by the server from `labelIds` **at write time**, on every write of `label_ids`: sync (§3.5), send (§4.3), mark as read (§4.4) and label updates (§4.7). The first matching rule wins:
+
+1. `labelIds` contains `TRASH` → `'trash'`
+2. contains `SPAM` → `'spam'`
+3. contains `INBOX` → `'inbox'`
+4. contains `SENT` → `'sent'`
+5. otherwise → `'archived'`
+
+No request body accepts `status`. A client changes it only indirectly, by changing labels (§4.7).
 
 ### 3.5 Sync procedure
 
@@ -203,12 +229,13 @@ The procedure is shared by the connect endpoint (§4.1) and the webhook (§4.5);
     - If `get` returns **404** (the message was deleted before the sync reached it), skip it and delete any stored row for that `gmail_id`. This is not an error.
   - `messagesDeleted` → delete the row (a no-op if there is none).
   - `labelsAdded` / `labelsRemoved` carry only the label IDs that changed, not the message's full label set:
-    - **If the row exists:** apply the change to the stored `label_ids` (set union for added, set difference for removed), then recompute `is_read` and `is_starred`.
+    - **If the row exists:** apply the change to the stored `label_ids` (set union for added, set difference for removed), then recompute `is_read`, `is_starred` and `status` (§3.4).
     - **If the row does not exist** (e.g. an older message beyond the initial 50 was moved into `INBOX`): `get` the message and upsert it, so its full, current label set is stored. A 404 there is skipped as above.
   - Records are applied in the order returned, so a later record wins.
   - Afterwards, set `history_id` to the response's `historyId`.
 - **404 fallback.** If `history.list` returns **404** (the start ID is outside the retained history window), fall back to a full sync. Through the provider abstraction this surfaces as `ProviderError` with `kind: 'cursor_expired'` (`src/providers/provider.ts`).
 - Both kinds set `users.last_synced_at = now()`.
+- *Added in v1.1:* a fetched message whose `labelIds` contain `DRAFT` is never stored, and any stored row for it is deleted. `history.list` reports draft changes even though the watch covers only INBOX; drafts are served by §4.10–§4.12 instead.
 
 ### 3.6 Environment variables
 
@@ -225,6 +252,37 @@ The procedure is shared by the connect endpoint (§4.1) and the webhook (§4.5);
 | `CRON_SECRET` | Cron authentication (§4.6). The name is fixed by Vercel |
 
 A missing required variable fails the function with `500 INTERNAL` and a log line naming the variable, never its value. The sign-in endpoints (§4.1a, §4.1b) answer `500 CONFIG_ERROR` instead.
+
+### 3.7 `DraftDTO` (*Added in v1.1*)
+
+Every draft endpoint returns this shape. Drafts live in Gmail only; they are not stored in the DB.
+
+```ts
+interface DraftDTO {
+  draftId: string;     // Gmail draft ID; server-managed (see below)
+  gmailId: string;     // Gmail ID of the draft's current message; changes on every update
+  threadId: string;    // Gmail-assigned, or the threadId the draft was created with
+  to: string[];
+  subject: string;
+  body: string;        // plain text
+  updatedAt: string;   // ISO-8601, server time of the create or update
+}
+```
+
+**`draftId` is server-managed.** Gmail assigns it on create (§4.10). A client never supplies one in a request body; it only echoes one it received from §4.10 back in the path of §4.11 and §4.12.
+
+**Draft request body** (§4.10, §4.11):
+
+```ts
+interface DraftRequest {
+  to?: string | string[];  // 0..100 addresses; the §4.3 address rules apply to each one
+  subject?: string;        // default ""; the §4.3 subject rules apply
+  body?: string;           // default ""
+  threadId?: string;       // the §4.3 threadId rule applies
+}
+```
+
+A draft may be incomplete: no recipients, an empty subject and an empty body are all valid. Any `draftId` or `status` key in the body → `VALIDATION_FAILED`.
 
 ---
 
@@ -310,7 +368,9 @@ If the configuration itself is missing (e.g. `FRONTEND_URL`), the callback answe
 
 ### 4.2 Message list — `GET /api/v1/messages`
 
-Returns INBOX messages from the DB, newest first. This endpoint **never calls Gmail**: the DB is kept current by push (§4.5).
+Returns the user's stored messages from the DB, newest first. This endpoint **never calls Gmail**: the DB is kept current by push (§4.5).
+
+*Changed in v1.1:* the list returns every stored message, not only INBOX ones, so that the client can filter on `status` (§3.4): messages archived or trashed after they were stored, and messages sent through §4.3. It still holds only what the engine has stored (§3.5), never the whole mailbox.
 
 **Request**
 
@@ -325,7 +385,7 @@ interface ListMessagesQuery {
 **Behavior**
 
 1. Authenticate (§3.1), then load `users` for the user.
-2. **Query:** select rows `WHERE user_id = $userId AND 'INBOX' = ANY(label_ids)` (`$userId` from the verified token), ordered by `(internal_date DESC, gmail_id DESC)`, using keyset pagination from the cursor and `limit + 1` rows to compute `nextCursor`.
+2. **Query:** select rows `WHERE user_id = $userId` (`$userId` from the verified token), ordered by `(internal_date DESC, gmail_id DESC)`, using keyset pagination from the cursor and `limit + 1` rows to compute `nextCursor`.
 
 **Cursor:** `base64url(JSON.stringify({ d: internalDateISO, g: gmailId }))`. Clients treat it as opaque.
 
@@ -427,7 +487,7 @@ interface MarkReadParams {
 1. Authenticate, then load `users`.
 2. Load the row `(user_id, gmail_id = id)`. If it is missing → `MESSAGE_NOT_FOUND`.
 3. Call `users.messages.modify({ id, requestBody: { removeLabelIds: ['UNREAD'] } })`. This is idempotent in Gmail.
-4. Update `label_ids` from the modify response's `labelIds`, set `is_read = true`, and set `synced_at = now()`.
+4. Update `label_ids` from the modify response's `labelIds`, set `is_read = true`, recompute `status` (§3.4), and set `synced_at = now()`.
 
 **Response — `200 OK`** (also returned when the message was already read)
 
@@ -589,6 +649,225 @@ interface RenewWatchesResponse {
 
 ---
 
+### 4.7 Update message labels — `PATCH /api/v1/messages/{id}` (*Added in v1.1*)
+
+Changes one message's labels. This is how a client stars, unstars, marks unread, archives, moves to trash and restores. `status` changes only as a consequence (§3.4). Function file: `api/v1/messages/[id].ts`.
+
+**Request** — `Content-Type: application/json`
+
+```ts
+// Path param: id = gmailId
+interface UpdateLabelsRequest {
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
+}
+```
+
+| Client action | Body |
+|---|---|
+| Star / unstar | `{ addLabelIds: ['STARRED'] }` / `{ removeLabelIds: ['STARRED'] }` |
+| Mark unread | `{ addLabelIds: ['UNREAD'] }` (mark as read stays §4.4) |
+| Archive / move back to inbox | `{ removeLabelIds: ['INBOX'] }` / `{ addLabelIds: ['INBOX'] }` |
+| Move to trash / restore | `{ addLabelIds: ['TRASH'] }` / `{ removeLabelIds: ['TRASH'] }` |
+| Apply / remove a custom label | its Gmail label ID, e.g. `{ addLabelIds: ['Label_12'] }` |
+
+Validation rules (`VALIDATION_FAILED` with `details.issues` listing every failure):
+
+- At least one label across both arrays; at most 20 in each; every entry a non-empty string.
+- No label appears in both arrays.
+- `DRAFT`, `SENT`, `SPAM` and `CHAT` are rejected.
+- `TRASH` must be the only label in the request.
+- Any other key, including `status`, `isRead` and `isStarred`, is rejected.
+
+**Behavior**
+
+1. Authenticate, then load `users`.
+2. Load the row `(user_id, gmail_id = id)`. If it is missing → `MESSAGE_NOT_FOUND`.
+3. Call Gmail:
+   - `TRASH` added → `users.messages.trash({ id })`;
+   - `TRASH` removed → `users.messages.untrash({ id })`;
+   - otherwise → `users.messages.modify({ id, requestBody: { addLabelIds, removeLabelIds } })`.
+
+   Each is idempotent in Gmail.
+4. Store the response's `labelIds` in `label_ids`, recompute `is_read`, `is_starred` and `status` (§3.4), and set `synced_at = now()`.
+
+**Response — `200 OK`**
+
+```ts
+interface UpdateLabelsResponse {
+  message: MessageDTO;
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | No valid session. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row or refresh token. |
+| `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
+| `VALIDATION_FAILED` | 400 | Body is not JSON or fails a rule above, or Gmail rejected a label ID as invalid (`details: { labelIds }`). |
+| `MESSAGE_NOT_FOUND` | 404 | No row for this user and ID, or Gmail returned 404. In the Gmail 404 case the stale row is deleted. |
+| `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
+| `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
+| `INTERNAL` | 500 | DB error or an unexpected exception. |
+
+---
+
+### 4.8 Thread view — `GET /api/v1/threads/{threadId}` (*Added in v1.1*)
+
+Returns the stored messages of one thread, oldest first. This endpoint **never calls Gmail**, so a thread shows only the messages the engine has stored (§3.5); older replies outside the initial 50 may be missing. Function file: `api/v1/threads/[threadId].ts`.
+
+**Request:** path param `threadId`, a non-empty string of letters and digits. No query, no body.
+
+**Behavior**
+
+1. Authenticate, then load `users`.
+2. Select rows `WHERE user_id = $userId AND thread_id = $threadId`, every `status` included, ordered by `(internal_date ASC, gmail_id ASC)`. At most the **100 newest** are returned, still in ascending order.
+3. Zero rows → `MESSAGE_NOT_FOUND` with `details: { threadId }`.
+
+**Response — `200 OK`**
+
+```ts
+interface ThreadResponse {
+  threadId: string;
+  messages: MessageDTO[];   // length 1..100, oldest first
+  truncated: boolean;       // true when older stored messages were left out
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row, or `refresh_token` is `null`. |
+| `VALIDATION_FAILED` | 400 | `threadId` is empty or not letters and digits. |
+| `MESSAGE_NOT_FOUND` | 404 | No stored message of this user has this `threadId`. |
+| `INTERNAL` | 500 | DB error or an unexpected exception. |
+
+---
+
+### 4.9 Search — `GET /api/v1/messages/search` (*Added in v1.1*)
+
+Searches the user's stored messages. This endpoint **never calls Gmail**: it searches only what §4.2 would list. Function file: `api/v1/messages/search.ts`.
+
+**Request**
+
+```ts
+// Query string
+interface SearchMessagesQuery {
+  q: string;        // required; 2..200 characters after trimming
+  limit?: number;   // integer 1..100, default 25
+  cursor?: string;  // a previous response's nextCursor for the same q
+}
+```
+
+**Behavior**
+
+1. Authenticate, then load `users`.
+2. Split `q` on whitespace into terms. A row matches when **every** term appears, case-insensitively, as a substring of at least one of `subject`, `from_address`, any `to_address` element, `snippet` or `body_plain`. `%`, `_` and `\` in terms are escaped, so they match literally.
+3. Every `status` is included. Order, keyset pagination and cursor format are those of §4.2.
+
+**Response — `200 OK`**
+
+```ts
+interface SearchMessagesResponse {
+  messages: MessageDTO[];      // length <= limit
+  nextCursor: string | null;
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row, or `refresh_token` is `null`. |
+| `VALIDATION_FAILED` | 400 | `q` missing or outside 2..200 characters, `limit` invalid, or `cursor` fails to decode. |
+| `INTERNAL` | 500 | DB error or an unexpected exception. |
+
+---
+
+### 4.10 Create draft — `POST /api/v1/drafts` (*Added in v1.1*)
+
+Creates a Gmail draft. Drafts are not stored in the DB. Function file: `api/v1/drafts/index.ts`.
+
+**Request:** `DraftRequest` (§3.7).
+
+**Behavior**
+
+1. Authenticate, then load the user's credentials and account email.
+2. Build the RFC 2822 message as in §4.3 step 2. The `To` header is omitted when there are no recipients.
+3. Call `users.drafts.create({ userId: 'me', requestBody: { message: { raw, threadId? } } })`. Gmail assigns the `draftId`.
+
+**Response — `201 Created`**
+
+```ts
+interface DraftResponse {
+  draft: DraftDTO;   // §3.7
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row or refresh token. |
+| `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
+| `VALIDATION_FAILED` | 400 | Body is not JSON or fails a §3.7 rule. |
+| `MESSAGE_NOT_FOUND` | 404 | Gmail rejected `threadId` as not found (`details: { threadId }`). |
+| `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
+| `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
+| `INTERNAL` | 500 | An unexpected exception. |
+
+---
+
+### 4.11 Update draft — `PATCH /api/v1/drafts/{draftId}` (*Added in v1.1*)
+
+Replaces a draft's content. Function file: `api/v1/drafts/[draftId].ts`.
+
+**Request:** path param `draftId` (from a §4.10 or §4.11 response; a non-empty string of letters, digits, `-` and `_`), and a `DraftRequest` body (§3.7).
+
+**Behavior**
+
+1. Authenticate, then load the user's credentials and account email.
+2. Build the message as in §4.10 and call `users.drafts.update({ userId: 'me', id: draftId, requestBody: { message: { raw, threadId? } } })`.
+   - This is a **full replacement**: a field omitted from the body is reset to its §3.7 default.
+   - The draft keeps its `draftId`; its `gmailId` changes.
+
+**Response — `200 OK`:** `DraftResponse` (§4.10).
+
+**Errors:** as §4.10, plus `VALIDATION_FAILED` for a malformed `draftId`, and `MESSAGE_NOT_FOUND` when Gmail does not know the `draftId` (`details: { draftId }`).
+
+---
+
+### 4.12 Delete draft — `DELETE /api/v1/drafts/{draftId}` (*Added in v1.1*)
+
+Discards a draft. Function file: `api/v1/drafts/[draftId].ts`.
+
+**Request:** path param `draftId` as in §4.11. No body.
+
+**Behavior:** authenticate, then call `users.drafts.delete({ userId: 'me', id: draftId })`. Sending a draft is two calls: the client sends its content with §4.3, then deletes the draft here.
+
+**Response — `204 No Content`**, empty body.
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row or refresh token. |
+| `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
+| `VALIDATION_FAILED` | 400 | Malformed `draftId`. |
+| `MESSAGE_NOT_FOUND` | 404 | Gmail does not know the `draftId` (`details: { draftId }`). A client that is cleaning up may treat this as already done. |
+| `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
+| `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
+| `INTERNAL` | 500 | An unexpected exception. |
+
+---
+
 ## 5. Data model
 
 ### 5.1 `messages` — one stored message
@@ -604,6 +883,7 @@ Source is the Gmail `users.messages.get` response with `format=full` (the `Messa
 | `label_ids` | `text[]` | `string[]` | no (default `{}`) | `m.labelIds` (absent → `[]`) |
 | `is_read` | `boolean` | `boolean` | no | Derived: `!m.labelIds.includes('UNREAD')` |
 | `is_starred` | `boolean` | `boolean` | no | Derived: `m.labelIds.includes('STARRED')` |
+| `status` | `text` | `MessageStatus` | no | *Added in v1.1.* Derived from `label_ids` by the §3.4 rule, on every write of `label_ids` |
 | `snippet` | `text` | `string` | no (default `''`) | `m.snippet` |
 | `history_id` | `text` | `string` | no | `m.historyId` (uint64, stored as text to avoid precision loss) |
 | `internal_date` | `timestamptz` | `string` (ISO) | no | `m.internalDate` (epoch-ms string → `new Date(Number(v))`) |
@@ -633,6 +913,7 @@ Constraints and indexes:
 
 - `UNIQUE (user_id, gmail_id)`. This is the upsert conflict target.
 - `INDEX (user_id, internal_date DESC, gmail_id DESC)`, used for list pagination.
+- *Added in v1.1:* `CHECK (status IN ('inbox','sent','archived','trash','spam'))`, and `INDEX (user_id, thread_id, internal_date)` for the thread view (§4.8). The schema session may add an index for search (§4.9), e.g. `pg_trgm`.
 - RLS enabled with **no policies**. That denies all access through the anon and authenticated roles: the Data API is closed to clients, and only the service role, which bypasses RLS, can read or write. This is defence in depth; isolation itself is §5.3.
 
 ### 5.2 `users` — one connected Google account per user

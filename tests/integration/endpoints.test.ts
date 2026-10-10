@@ -209,7 +209,7 @@ describe('§4.1b GET /api/v1/auth/google/callback', () => {
 });
 
 describe('§4.2 GET /api/v1/messages', () => {
-  it('200: INBOX only, newest first, cursor paging, DB only', async () => {
+  it('200: every stored message with its status (v1.1), newest first, cursor paging, DB only', async () => {
     const user = await createTestUser();
     const app = buildApp();
     await seedConnectedUser(app, user, { historyId: '10' });
@@ -223,13 +223,20 @@ describe('§4.2 GET /api/v1/messages', () => {
 
     const first = await app.handlers.listMessages(req.get('/api/v1/messages?limit=2', bearerFor(user)));
     expect(first.status).toBe(200);
-    const page1 = (await first.json()) as { messages: Array<{ gmailId: string }>; nextCursor: string; lastSyncedAt: string };
-    expect(page1.messages.map((m) => m.gmailId)).toEqual(['aaa3', 'aaa2']);
+    const page1 = (await first.json()) as {
+      messages: Array<{ gmailId: string; status: string }>;
+      nextCursor: string;
+      lastSyncedAt: string;
+    };
+    expect(page1.messages.map((m) => [m.gmailId, m.status])).toEqual([
+      ['sent1', 'sent'],
+      ['aaa3', 'inbox'],
+    ]);
     expect(page1.lastSyncedAt).not.toBeNull();
 
     const second = await app.handlers.listMessages(req.get(`/api/v1/messages?limit=2&cursor=${page1.nextCursor}`, bearerFor(user)));
     const page2 = (await second.json()) as { messages: Array<{ gmailId: string }>; nextCursor: string | null };
-    expect(page2.messages.map((m) => m.gmailId)).toEqual(['aaa1']);
+    expect(page2.messages.map((m) => m.gmailId)).toEqual(['aaa2', 'aaa1']);
     expect(page2.nextCursor).toBeNull();
     expect(app.box.calls).toEqual([]);
   });

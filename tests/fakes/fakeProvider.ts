@@ -1,6 +1,7 @@
 import {
   type AccountCredentials,
   type ChangePage,
+  type DraftResult,
   type MailProvider,
   type MailProviderFactory,
   type OnTokens,
@@ -16,6 +17,7 @@ import {
 export const FAKE_INBOX = 'INBOX';
 export const FAKE_UNREAD = 'UNREAD';
 export const FAKE_STARRED = 'STARRED';
+export const FAKE_TRASH = 'TRASH';
 
 export const cursor = (value: number | string): SyncCursor => String(value) as SyncCursor;
 
@@ -30,6 +32,8 @@ export interface FakeMailbox {
   expiredBefore: SyncCursor | null;
   currentCursor: SyncCursor;
   sent: OutgoingMessage[];
+  /** Gmail drafts by draft ID. */
+  drafts: Map<string, { message: OutgoingMessage; messageId: string; threadId: string }>;
   calls: FakeCall[];
   /** Scripted failures: the next call to the method rejects with this error, then the entry is removed. */
   failNext: Map<keyof MailProvider, ProviderError>;
@@ -44,6 +48,7 @@ export function createFakeMailbox(): FakeMailbox {
     expiredBefore: null,
     currentCursor: cursor(1),
     sent: [],
+    drafts: new Map(),
     calls: [],
     failNext: new Map(),
     forbidCalls: false,
@@ -180,6 +185,51 @@ class FakeMailProvider implements MailProvider {
     return this.setLabels(id, [FAKE_UNREAD], []);
   }
 
+  async modifyLabels(id: string, change: { add: string[]; remove: string[] }): Promise<{ labels: string[] }> {
+    this.record('modifyLabels', [id, change]);
+    return this.setLabels(id, change.add, change.remove);
+  }
+
+  async trash(id: string): Promise<{ labels: string[] }> {
+    this.record('trash', [id]);
+    return this.setLabels(id, [FAKE_TRASH], [FAKE_INBOX]);
+  }
+
+  async untrash(id: string): Promise<{ labels: string[] }> {
+    this.record('untrash', [id]);
+    return this.setLabels(id, [], [FAKE_TRASH]);
+  }
+
+  private storeDraft(draftId: string, message: OutgoingMessage): DraftResult {
+    if (message.threadId && ![...this.box.messages.values()].some((m) => m.threadId === message.threadId)) {
+      throw new ProviderError('not_found', `thread ${message.threadId} not found`);
+    }
+    const messageId = `draftmsg${this.box.calls.length}`;
+    const threadId = message.threadId ?? messageId;
+    this.box.drafts.set(draftId, { message, messageId, threadId });
+    return { draftId, messageId, threadId };
+  }
+
+  async createDraft(message: OutgoingMessage): Promise<DraftResult> {
+    this.record('createDraft', [message]);
+    return this.storeDraft(`r-${this.box.drafts.size + 1}`, message);
+  }
+
+  async updateDraft(draftId: string, message: OutgoingMessage): Promise<DraftResult> {
+    this.record('updateDraft', [draftId, message]);
+    if (!this.box.drafts.has(draftId)) {
+      throw new ProviderError('not_found', `draft ${draftId} not found`);
+    }
+    return this.storeDraft(draftId, message);
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    this.record('deleteDraft', [draftId]);
+    if (!this.box.drafts.delete(draftId)) {
+      throw new ProviderError('not_found', `draft ${draftId} not found`);
+    }
+  }
+
   async watch(): Promise<WatchResult> {
     this.record('watch', []);
     return { cursor: this.box.currentCursor, expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000) };
@@ -208,7 +258,15 @@ export function createFakeProviderFactory(
 ) {
   const factory = {
     providerId: 'fake',
-    wellKnownLabels: { inbox: FAKE_INBOX, unread: FAKE_UNREAD, starred: FAKE_STARRED },
+    wellKnownLabels: {
+      inbox: FAKE_INBOX,
+      unread: FAKE_UNREAD,
+      starred: FAKE_STARRED,
+      sent: 'SENT',
+      trash: FAKE_TRASH,
+      spam: 'SPAM',
+      draft: 'DRAFT',
+    },
     forAccount(_credentials: AccountCredentials, onTokens: OnTokens): MailProvider {
       return new FakeMailProvider(box, onTokens);
     },

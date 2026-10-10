@@ -276,7 +276,7 @@ describe('GET /api/v1/auth/google/callback (§4.1b)', () => {
 });
 
 describe('GET /api/v1/messages (§4.2)', () => {
-  it('pages INBOX rows newest first with an opaque cursor, without calling Gmail', async () => {
+  it('pages every stored row newest first (v1.1) with an opaque cursor, without calling Gmail', async () => {
     const { h, box, store } = setup();
     await store('m1', 1);
     await store('m2', 2);
@@ -287,14 +287,21 @@ describe('GET /api/v1/messages (§4.2)', () => {
     const first = await h.listMessages(get('/api/v1/messages?limit=2', bearer()));
     expect(first.status).toBe(200);
     expect(first.headers.get('access-control-allow-origin')).toBe(FRONTEND);
-    const page1 = (await first.json()) as { messages: Array<{ gmailId: string; isRead: boolean }>; nextCursor: string | null; lastSyncedAt: string };
-    expect(page1.messages.map((m) => m.gmailId)).toEqual(['m3', 'm2']);
+    const page1 = (await first.json()) as {
+      messages: Array<{ gmailId: string; isRead: boolean; status: string }>;
+      nextCursor: string | null;
+      lastSyncedAt: string;
+    };
+    expect(page1.messages.map((m) => [m.gmailId, m.status])).toEqual([
+      ['sent', 'sent'],
+      ['m3', 'inbox'],
+    ]);
     expect(page1.lastSyncedAt).toBe(now.toISOString());
     expect(page1.nextCursor).not.toBeNull();
 
     const second = await h.listMessages(get(`/api/v1/messages?limit=2&cursor=${page1.nextCursor ?? ''}`, bearer()));
     const page2 = (await second.json()) as { messages: Array<{ gmailId: string }>; nextCursor: string | null };
-    expect(page2.messages.map((m) => m.gmailId)).toEqual(['m1']);
+    expect(page2.messages.map((m) => m.gmailId)).toEqual(['m2', 'm1']);
     expect(page2.nextCursor).toBeNull();
     expect(box.calls).toEqual([]);
   });
@@ -339,7 +346,7 @@ describe('POST /api/v1/messages/{id}/read (§4.4)', () => {
     const two = await h.markRead(post('/api/v1/messages/m1/read', {}, bearer()));
     expect([one.status, two.status]).toEqual([200, 200]);
     const { message } = (await two.json()) as { message: { isRead: boolean; labelIds: string[] } };
-    expect(message).toMatchObject({ isRead: true, labelIds: ['INBOX'] });
+    expect(message).toMatchObject({ isRead: true, labelIds: ['INBOX'], status: 'inbox' });
   });
 
   it('returns 404 for a message the user does not have, with no Gmail call', async () => {
@@ -383,7 +390,7 @@ describe('webhook, preflight and configuration', () => {
     const { h } = setup();
     const response = await h.options(new Request('https://api.vibemail.test/api/v1/messages', { method: 'OPTIONS' }));
     expect(response.status).toBe(204);
-    expect(response.headers.get('access-control-allow-methods')).toBe('GET, POST');
+    expect(response.headers.get('access-control-allow-methods')).toBe('GET, POST, PATCH, DELETE');
     expect(response.headers.get('access-control-allow-headers')).toBe('Authorization, Content-Type');
   });
 

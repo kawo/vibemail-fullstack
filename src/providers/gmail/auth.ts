@@ -169,6 +169,9 @@ export function toProviderError(error: unknown, context: string): ProviderError 
   if (status === 404) {
     return new ProviderError('not_found', `${context}: not found`, { cause: error });
   }
+  if (status === 400) {
+    return new ProviderError('invalid_request', `${context}: request rejected`, { cause: error });
+  }
   return new ProviderError('upstream', `${context}: Google request failed`, { cause: error });
 }
 

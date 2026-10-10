@@ -102,3 +102,37 @@ describe('applyLabelDelta', () => {
     expect(applyLabelDelta(['A', 'B'], removed)).toEqual(['B']);
   });
 });
+
+describe('runIncrementalSync: drafts (CONTRACT.md §3.5, v1.1)', () => {
+  it('skips an added draft and deletes a stored copy of one', async () => {
+    const { deps, box, messages, pages, store } = setup();
+    await store('d2', ['DRAFT']);
+    box.messages.set('d1', fakeMessage({ id: 'd1', labels: ['DRAFT'] }));
+    box.messages.set('d2', fakeMessage({ id: 'd2', labels: ['DRAFT'] }));
+    pages([
+      [
+        '',
+        {
+          changes: [
+            { type: 'messageAdded', messageId: 'd1' },
+            { type: 'labelsRemoved', messageId: 'd1', labels: ['UNREAD'] },
+            { type: 'messageAdded', messageId: 'd2' },
+          ],
+          nextPageToken: null,
+          cursor: cursor(150),
+        },
+      ],
+    ]);
+    const result = await runIncrementalSync(deps, USER, cursor(100));
+    expect(result).toMatchObject({ applied: 0, skipped: 3 });
+    expect(messages.forUser(USER)).toEqual([]);
+  });
+
+  it('recomputes status when a label delta moves a stored message', async () => {
+    const { deps, messages, pages, store } = setup();
+    await store('m1', ['INBOX']);
+    pages([['', { changes: [{ type: 'labelsAdded', messageId: 'm1', labels: ['TRASH'] }], nextPageToken: null, cursor: cursor(150) }]]);
+    await runIncrementalSync(deps, USER, cursor(100));
+    expect((await messages.getMessage(USER, 'm1'))?.status).toBe('trash');
+  });
+});

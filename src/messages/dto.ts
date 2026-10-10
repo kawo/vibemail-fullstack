@@ -11,6 +11,7 @@ export function toMessageDTO(row: MessageWrite): MessageDTO {
     gmailId: row.gmail_id,
     threadId: row.thread_id,
     labelIds: row.label_ids,
+    status: row.status,
     isRead: row.is_read,
     isStarred: row.is_starred,
     snippet: row.snippet,
