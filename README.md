@@ -60,6 +60,10 @@ tests/unit/          unit tests against in-memory fakes
 tests/integration/   tests against a real dev/test Supabase project
 ```
 
+## Frontend
+
+[`web/`](web/) holds **VibeMail Glass**, the Vite + React frontend that implements [`docs/DESIGN_SPEC.md`](docs/DESIGN_SPEC.md). It is a separate npm project with its own setup; see [`web/README.md`](web/README.md). Deploy it as its own Vercel project with `web` as the root directory, and set the engine's `FRONTEND_URL` to its origin.
+
 ## Getting started
 
 ### Prerequisites
