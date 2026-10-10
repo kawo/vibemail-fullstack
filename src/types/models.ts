@@ -1,5 +1,5 @@
 // Hand-written types over the generated `database.ts`: DB row types with
-// `attachments` narrowed from `Json`, and the CONTRACT.md §3.4 DTOs.
+// `attachments` and `status` narrowed, and the CONTRACT.md §3.4 / §3.7 DTOs.
 // `database.ts` is generated, never edited by hand: `npm run db:types`
 // (`supabase gen types typescript --linked`) against the dev/test project with
 // the migration applied, or `--local` after `supabase db reset`.
@@ -21,10 +21,16 @@ export type AttachmentMeta = {
   attachmentId: string;
 };
 
+/** CONTRACT.md §3.4 (v1.1): derived from `labelIds` at write time; never set by a client. */
+export type MessageStatus = 'inbox' | 'sent' | 'archived' | 'trash' | 'spam';
+
+export const MESSAGE_STATUSES: readonly MessageStatus[] = ['inbox', 'sent', 'archived', 'trash', 'spam'];
+
 export interface MessageDTO {
   gmailId: string;
   threadId: string;
   labelIds: string[];
+  status: MessageStatus;
   isRead: boolean;
   isStarred: boolean;
   snippet: string;
@@ -47,19 +53,36 @@ export interface MessageDTO {
 }
 
 // ---------------------------------------------------------------------------
+// CONTRACT.md §3.7 (v1.1). Drafts live in Gmail only; `draftId` is server-managed.
+// ---------------------------------------------------------------------------
+
+export interface DraftDTO {
+  draftId: string;
+  gmailId: string;
+  threadId: string;
+  to: string[];
+  subject: string;
+  body: string;
+  updatedAt: string; // ISO-8601
+}
+
+// ---------------------------------------------------------------------------
 // CONTRACT.md §5.1 `messages`
 // ---------------------------------------------------------------------------
 
-export type MessageRow = Omit<Tables<'messages'>, 'attachments'> & {
+export type MessageRow = Omit<Tables<'messages'>, 'attachments' | 'status'> & {
   attachments: AttachmentMeta[];
+  status: MessageStatus;
 };
 
-export type MessageInsert = Omit<TablesInsert<'messages'>, 'attachments'> & {
+export type MessageInsert = Omit<TablesInsert<'messages'>, 'attachments' | 'status'> & {
   attachments?: AttachmentMeta[];
+  status?: MessageStatus;
 };
 
-export type MessageUpdate = Omit<TablesUpdate<'messages'>, 'attachments'> & {
+export type MessageUpdate = Omit<TablesUpdate<'messages'>, 'attachments' | 'status'> & {
   attachments?: AttachmentMeta[];
+  status?: MessageStatus;
 };
 
 // ---------------------------------------------------------------------------
