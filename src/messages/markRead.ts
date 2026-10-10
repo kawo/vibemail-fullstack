@@ -1,4 +1,5 @@
 import type { MessageRow, MessagesRepository } from '../db/messages';
+import { deriveStatus } from '../db/status';
 import type { UsersRepository } from '../db/users';
 import { ApiError } from '../middleware/errors';
 import { type MailProviderFactory, ProviderError } from '../providers/provider';
@@ -54,6 +55,7 @@ export async function markMessageRead(deps: MarkReadDeps, userId: string, gmailI
   return {
     ...stored,
     label_ids: update.labels,
+    status: deriveStatus(update.labels),
     is_read: update.isRead,
     is_starred: update.isStarred,
     synced_at: syncedAt.toISOString(),

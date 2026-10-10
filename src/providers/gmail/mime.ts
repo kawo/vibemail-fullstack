@@ -52,7 +52,8 @@ function base64Body(text: string): string {
 export function buildRfc2822(message: OutgoingMessage, date: Date = new Date()): string {
   const headers = [
     `From: ${encodeAddress(message.from)}`,
-    `To: ${message.to.map(encodeAddress).join(', ')}`,
+    // A draft may have no recipients yet (CONTRACT.md §4.10): omit the header rather than send it empty.
+    ...(message.to.length > 0 ? [`To: ${message.to.map(encodeAddress).join(', ')}`] : []),
     ...(message.cc && message.cc.length > 0 ? [`Cc: ${message.cc.map(encodeAddress).join(', ')}`] : []),
     ...(message.bcc && message.bcc.length > 0 ? [`Bcc: ${message.bcc.map(encodeAddress).join(', ')}`] : []),
     `Subject: ${encodeHeaderText(message.subject)}`,

@@ -1,6 +1,7 @@
 import {
   type AccountCredentials,
   type ChangePage,
+  type DraftResult,
   type MailProvider,
   type MailProviderFactory,
   type OnTokens,
@@ -31,6 +32,10 @@ import { buildRfc2822, toRaw } from './mime';
 export const GMAIL_INBOX_LABEL = 'INBOX';
 export const GMAIL_UNREAD_LABEL = 'UNREAD';
 export const GMAIL_STARRED_LABEL = 'STARRED';
+export const GMAIL_SENT_LABEL = 'SENT';
+export const GMAIL_TRASH_LABEL = 'TRASH';
+export const GMAIL_SPAM_LABEL = 'SPAM';
+export const GMAIL_DRAFT_LABEL = 'DRAFT';
 
 /** Gmail history IDs are unsigned 64-bit integers with gaps; compare them as BigInt. */
 export function compareHistoryIds(a: SyncCursor, b: SyncCursor): -1 | 0 | 1 {
@@ -170,22 +175,73 @@ export class GmailMailProvider implements MailProvider {
   }
 
   /** `messages.modify`; idempotent in Gmail. Returns the message's labels afterwards. */
-  private async modifyLabels(
-    id: string,
-    change: { addLabelIds?: string[]; removeLabelIds?: string[] },
-  ): Promise<{ labels: string[] }> {
+  async modifyLabels(id: string, change: { add: string[]; remove: string[] }): Promise<{ labels: string[] }> {
     const { data } = await this.call('messages.modify', () =>
-      this.gmail.users.messages.modify({ userId: 'me', id, requestBody: change }),
+      this.gmail.users.messages.modify({
+        userId: 'me',
+        id,
+        requestBody: {
+          ...(change.add.length > 0 ? { addLabelIds: change.add } : {}),
+          ...(change.remove.length > 0 ? { removeLabelIds: change.remove } : {}),
+        },
+      }),
     );
     return { labels: data.labelIds ?? [] };
   }
 
   async markRead(id: string): Promise<{ labels: string[] }> {
-    return this.modifyLabels(id, { removeLabelIds: [GMAIL_UNREAD_LABEL] });
+    return this.modifyLabels(id, { add: [], remove: [GMAIL_UNREAD_LABEL] });
   }
 
   async markUnread(id: string): Promise<{ labels: string[] }> {
-    return this.modifyLabels(id, { addLabelIds: [GMAIL_UNREAD_LABEL] });
+    return this.modifyLabels(id, { add: [GMAIL_UNREAD_LABEL], remove: [] });
+  }
+
+  /** `messages.trash`: Gmail's way to add `TRASH` (CONTRACT.md §4.7). */
+  async trash(id: string): Promise<{ labels: string[] }> {
+    const { data } = await this.call('messages.trash', () => this.gmail.users.messages.trash({ userId: 'me', id }));
+    return { labels: data.labelIds ?? [] };
+  }
+
+  /** `messages.untrash`: Gmail's way to remove `TRASH` (CONTRACT.md §4.7). */
+  async untrash(id: string): Promise<{ labels: string[] }> {
+    const { data } = await this.call('messages.untrash', () => this.gmail.users.messages.untrash({ userId: 'me', id }));
+    return { labels: data.labelIds ?? [] };
+  }
+
+  /** Builds the draft's MIME like `sendMessage`; `threadId` is passed through unchanged. */
+  private draftBody(message: OutgoingMessage): gmail_v1.Schema$Draft {
+    return {
+      message: {
+        raw: toRaw(buildRfc2822(message)),
+        ...(message.threadId ? { threadId: message.threadId } : {}),
+      },
+    };
+  }
+
+  private static draftResult(data: gmail_v1.Schema$Draft, context: string): DraftResult {
+    if (!data.id || !data.message?.id || !data.message.threadId) {
+      throw new ProviderError('upstream', `${context} response lacks the draft or message ID`);
+    }
+    return { draftId: data.id, messageId: data.message.id, threadId: data.message.threadId };
+  }
+
+  async createDraft(message: OutgoingMessage): Promise<DraftResult> {
+    const { data } = await this.call('drafts.create', () =>
+      this.gmail.users.drafts.create({ userId: 'me', requestBody: this.draftBody(message) }),
+    );
+    return GmailMailProvider.draftResult(data, 'drafts.create');
+  }
+
+  async updateDraft(draftId: string, message: OutgoingMessage): Promise<DraftResult> {
+    const { data } = await this.call('drafts.update', () =>
+      this.gmail.users.drafts.update({ userId: 'me', id: draftId, requestBody: this.draftBody(message) }),
+    );
+    return GmailMailProvider.draftResult(data, 'drafts.update');
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    await this.call('drafts.delete', () => this.gmail.users.drafts.delete({ userId: 'me', id: draftId }));
   }
 
   async watch(): Promise<WatchResult> {
@@ -200,7 +256,15 @@ export class GmailMailProvider implements MailProvider {
 export function createGmailProviderFactory(config: GmailAuthConfig): MailProviderFactory {
   return {
     providerId: 'gmail',
-    wellKnownLabels: { inbox: GMAIL_INBOX_LABEL, unread: GMAIL_UNREAD_LABEL, starred: GMAIL_STARRED_LABEL },
+    wellKnownLabels: {
+      inbox: GMAIL_INBOX_LABEL,
+      unread: GMAIL_UNREAD_LABEL,
+      starred: GMAIL_STARRED_LABEL,
+      sent: GMAIL_SENT_LABEL,
+      trash: GMAIL_TRASH_LABEL,
+      spam: GMAIL_SPAM_LABEL,
+      draft: GMAIL_DRAFT_LABEL,
+    },
     forAccount: (credentials: AccountCredentials, onTokens: OnTokens): MailProvider =>
       new GmailMailProvider(config, credentials, onTokens),
     verifyRefreshToken: (refreshToken: string): Promise<VerifiedGrant> => verifyRefreshToken(config, refreshToken),

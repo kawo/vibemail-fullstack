@@ -25,9 +25,17 @@ export interface SyncDeps {
   now?: () => Date;
 }
 
+/**
+ * Drafts are never stored as messages (CONTRACT.md §3.5, v1.1): `history.list` reports them even
+ * though the watch covers only INBOX. They are served by the draft endpoints instead.
+ */
+function isDraft(deps: SyncDeps, message: ProviderMessage): boolean {
+  return message.labels.includes(deps.factory.wellKnownLabels.draft);
+}
+
 export interface InitialSyncResult {
   stored: number;
-  /** Messages listed but gone by the time `getMessage` ran. */
+  /** Messages listed but gone by the time `getMessage` ran, or drafts. */
   skipped: number;
   /** The stored `users.history_id` afterwards; null for an empty inbox. */
   historyId: SyncCursor | null;
@@ -45,7 +53,13 @@ export async function runInitialSync(deps: SyncDeps, userId: string): Promise<In
   let skipped = 0;
   for (const id of ids) {
     try {
-      fetched.push(await deps.provider.getMessage(id));
+      const message = await deps.provider.getMessage(id);
+      if (isDraft(deps, message)) {
+        skipped += 1;
+        await deps.messages.deleteMessage(userId, id);
+        continue;
+      }
+      fetched.push(message);
     } catch (error) {
       if (error instanceof ProviderError && error.kind === 'not_found') {
         skipped += 1;
@@ -75,7 +89,7 @@ export async function runInitialSync(deps: SyncDeps, userId: string): Promise<In
 
 export interface IncrementalSyncResult {
   applied: number;
-  /** Messages referenced by a change but gone by the time `getMessage` ran. */
+  /** Messages referenced by a change but gone by the time `getMessage` ran, or drafts. */
   skipped: number;
   historyId: SyncCursor;
 }
@@ -118,10 +132,15 @@ export async function runIncrementalSync(
   let applied = 0;
   let skipped = 0;
 
-  /** Fetches and stores a full message; a 404 deletes any stored copy instead. */
+  /** Fetches and stores a full message; a 404 or a draft deletes any stored copy instead. */
   const fetchAndStore = async (gmailId: string): Promise<void> => {
     try {
       const message = await deps.provider.getMessage(gmailId);
+      if (isDraft(deps, message)) {
+        skipped += 1;
+        await deps.messages.deleteMessage(userId, gmailId);
+        return;
+      }
       await deps.messages.upsertMessage(userId, message, now());
       applied += 1;
     } catch (error) {

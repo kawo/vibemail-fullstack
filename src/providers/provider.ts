@@ -18,6 +18,8 @@ export type ProviderErrorKind =
   | 'not_found'
   /** The sync cursor is outside the provider's retained history; run a full sync (CONTRACT.md §3.5). */
   | 'cursor_expired'
+  /** The provider rejected the request's arguments, e.g. an unknown label ID (CONTRACT.md §4.7). */
+  | 'invalid_request'
   /** Any other provider failure. Maps to GMAIL_UPSTREAM_ERROR or SYNC_FAILED. */
   | 'upstream';
 
@@ -148,6 +150,15 @@ export interface ChangePage {
   cursor: SyncCursor;
 }
 
+/** A draft as the provider stored it (CONTRACT.md §3.7). */
+export interface DraftResult {
+  /** The provider-assigned draft ID. Never chosen by a client. */
+  draftId: string;
+  /** ID of the draft's current message; changes on every update. */
+  messageId: string;
+  threadId: string;
+}
+
 export interface WatchResult {
   cursor: SyncCursor;
   /** When push notifications stop unless `watch()` is called again. */
@@ -173,9 +184,27 @@ export interface MailProvider {
 
   /**
    * Marks a message unread; idempotent. Returns the message's labels afterwards.
-   * @remarks Not used in v1 (CONTRACT.md §1).
+   * @remarks Routes use `modifyLabels` instead (CONTRACT.md §4.7).
    */
   markUnread(id: string): Promise<{ labels: string[] }>;
+
+  /** Adds and removes labels; idempotent. Returns the message's labels afterwards (CONTRACT.md §4.7). */
+  modifyLabels(id: string, change: { add: string[]; remove: string[] }): Promise<{ labels: string[] }>;
+
+  /** Moves a message to the trash; idempotent. Returns its labels afterwards. */
+  trash(id: string): Promise<{ labels: string[] }>;
+
+  /** Restores a message from the trash; idempotent. Returns its labels afterwards. */
+  untrash(id: string): Promise<{ labels: string[] }>;
+
+  /** Creates a draft (CONTRACT.md §4.10). Rejects with `not_found` for an unknown `threadId`. */
+  createDraft(message: OutgoingMessage): Promise<DraftResult>;
+
+  /** Replaces a draft's content (CONTRACT.md §4.11). Rejects with `not_found` for an unknown draft. */
+  updateDraft(draftId: string, message: OutgoingMessage): Promise<DraftResult>;
+
+  /** Deletes a draft (CONTRACT.md §4.12). Rejects with `not_found` for an unknown draft. */
+  deleteDraft(draftId: string): Promise<void>;
 
   /** Registers or renews push notifications for the inbox (CONTRACT.md §4.1, §4.5, §4.6). */
   watch(): Promise<WatchResult>;
@@ -188,8 +217,16 @@ export interface MailProvider {
 export interface MailProviderFactory {
   readonly providerId: string;
 
-  /** The provider's label IDs for inbox, unread and starred state, for applying label deltas. */
-  readonly wellKnownLabels: { readonly inbox: string; readonly unread: string; readonly starred: string };
+  /** The provider's label IDs for mailbox state, for applying label deltas and deriving `status`. */
+  readonly wellKnownLabels: {
+    readonly inbox: string;
+    readonly unread: string;
+    readonly starred: string;
+    readonly sent: string;
+    readonly trash: string;
+    readonly spam: string;
+    readonly draft: string;
+  };
 
   /** Binds a provider to one mailbox. `onTokens` persists every refresh. */
   forAccount(credentials: AccountCredentials, onTokens: OnTokens): MailProvider;

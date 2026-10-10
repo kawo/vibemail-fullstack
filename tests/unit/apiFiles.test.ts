@@ -7,6 +7,11 @@ import * as callback from '../../api/v1/auth/google/callback';
 import * as list from '../../api/v1/messages/index';
 import * as send from '../../api/v1/messages/send';
 import * as read from '../../api/v1/messages/[id]/read';
+import * as labels from '../../api/v1/messages/[id]';
+import * as search from '../../api/v1/messages/search';
+import * as thread from '../../api/v1/threads/[threadId]';
+import * as drafts from '../../api/v1/drafts/index';
+import * as draft from '../../api/v1/drafts/[draftId]';
 import * as webhook from '../../api/webhook/gmail';
 import * as cron from '../../api/cron/renew-watch';
 
@@ -17,6 +22,11 @@ describe('api/ function files (CONTRACT.md §4)', () => {
     ['messages', list, ['GET', 'OPTIONS']],
     ['send', send, ['OPTIONS', 'POST']],
     ['read', read, ['OPTIONS', 'POST']],
+    ['labels', labels, ['OPTIONS', 'PATCH']],
+    ['search', search, ['GET', 'OPTIONS']],
+    ['thread', thread, ['GET', 'OPTIONS']],
+    ['drafts', drafts, ['OPTIONS', 'POST']],
+    ['draft', draft, ['DELETE', 'OPTIONS', 'PATCH']],
     ['webhook', webhook, ['POST']],
     ['cron', cron, ['GET']],
   ])('%s exports only %j', (_name, module, methods) => {

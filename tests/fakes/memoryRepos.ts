@@ -1,4 +1,5 @@
 import { type ListCursor, type MessageRow, type MessageWrite, type MessagesRepository, toMessageRow } from '../../src/db/messages';
+import { deriveStatus } from '../../src/db/status';
 import type {
   ConnectedAccount,
   ConnectedUserInput,
@@ -113,19 +114,37 @@ export class MemoryMessages implements MessagesRepository {
     return `${userId}:${gmailId}`;
   }
 
-  async listInbox(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]> {
+  /** Newest first, strictly after `after`, matching the real keyset order. */
+  private page(rows: MessageRow[], limit: number, after: ListCursor | null): MessageRow[] {
     const before = (r: MessageRow) =>
       !after ||
       r.internal_date < after.internalDate ||
       (r.internal_date === after.internalDate && r.gmail_id < after.gmailId);
-    return this.forUser(userId)
-      .filter((r) => r.label_ids.includes('INBOX') && before(r))
+    return rows
+      .filter(before)
       .sort((a, b) =>
         a.internal_date === b.internal_date
           ? b.gmail_id.localeCompare(a.gmail_id)
           : b.internal_date.localeCompare(a.internal_date),
       )
       .slice(0, limit);
+  }
+  async listMessages(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]> {
+    return this.page(this.forUser(userId), limit, after);
+  }
+  async listThread(userId: string, threadId: string, limit: number): Promise<MessageRow[]> {
+    return this.page(this.forUser(userId).filter((r) => r.thread_id === threadId), limit, null);
+  }
+  /** Same semantics as the `search_messages` SQL function: every term, case-insensitive substring. */
+  async searchMessages(userId: string, terms: string[], limit: number, after: ListCursor | null): Promise<MessageRow[]> {
+    const matches = (r: MessageRow) =>
+      terms.every((term) => {
+        const t = term.toLowerCase();
+        return [r.subject ?? '', r.from_address, r.snippet, r.body_plain ?? '', ...r.to_address].some((field) =>
+          field.toLowerCase().includes(t),
+        );
+      });
+    return this.page(this.forUser(userId).filter(matches), limit, after);
   }
   async getMessage(userId: string, gmailId: string): Promise<MessageRow | null> {
     return this.rows.get(MemoryMessages.key(userId, gmailId)) ?? null;
@@ -163,6 +182,7 @@ export class MemoryMessages implements MessagesRepository {
       this.rows.set(MemoryMessages.key(userId, gmailId), {
         ...row,
         label_ids: update.labels,
+        status: deriveStatus(update.labels),
         is_read: update.isRead,
         is_starred: update.isStarred,
         synced_at: update.syncedAt.toISOString(),

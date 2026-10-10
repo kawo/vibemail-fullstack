@@ -165,7 +165,10 @@ export async function signInWithGoogle(deps: SignInDeps, input: { code: string }
  * Throws `GMAIL_NOT_CONNECTED` without a usable row, and `GMAIL_TOKEN_REVOKED` when the stored
  * value cannot be decrypted (CONTRACT.md §5.4).
  */
-export async function providerForUser(deps: GmailAccountDeps, userId: string): Promise<MailProvider> {
+export async function providerForUser(
+  deps: Pick<GmailAccountDeps, 'factory' | 'users'>,
+  userId: string,
+): Promise<MailProvider> {
   let credentials;
   try {
     credentials = await deps.users.getUserCredentials(userId);

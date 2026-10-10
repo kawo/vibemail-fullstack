@@ -162,3 +162,58 @@ describe('GmailMailProvider.markRead / markUnread', () => {
     expect(bodies).toEqual([{ removeLabelIds: ['UNREAD'] }, { addLabelIds: ['UNREAD'] }]);
   });
 });
+
+describe('GmailMailProvider label changes (CONTRACT.md §4.7)', () => {
+  it('modifyLabels sends only the non-empty lists and returns the labels', async () => {
+    const { provider, calls } = providerWith(() => ({ data: { id: 'm1', labelIds: ['STARRED'] } }));
+    await expect(provider.modifyLabels('m1', { add: ['STARRED'], remove: [] })).resolves.toEqual({ labels: ['STARRED'] });
+    expect(calls[0]?.url).toContain('/gmail/v1/users/me/messages/m1/modify');
+    expect((calls[0] as RequestOptions & { data?: unknown }).data).toEqual({ addLabelIds: ['STARRED'] });
+  });
+
+  it('trash and untrash call their own endpoints', async () => {
+    const { provider, calls } = providerWith((o) => ({
+      data: { id: 'm1', labelIds: o.url.endsWith('/trash') ? ['TRASH'] : ['INBOX'] },
+    }));
+    await expect(provider.trash('m1')).resolves.toEqual({ labels: ['TRASH'] });
+    await expect(provider.untrash('m1')).resolves.toEqual({ labels: ['INBOX'] });
+    expect(calls.map((c) => c.url.replace(/^.*\/messages\//, ''))).toEqual(['m1/trash', 'm1/untrash']);
+  });
+
+  it('maps a 400 (e.g. an invalid label ID) to invalid_request', async () => {
+    const { provider } = providerWith(() => {
+      throw { response: { status: 400, data: { error: { errors: [{ reason: 'invalidArgument' }] } } } };
+    });
+    await expect(provider.modifyLabels('m1', { add: ['Label_x'], remove: [] })).rejects.toMatchObject({
+      kind: 'invalid_request',
+    });
+  });
+});
+
+describe('GmailMailProvider drafts (CONTRACT.md §4.10–§4.12)', () => {
+  const draft = { id: 'r-5', message: { id: 'dm1', threadId: 'T3', labelIds: ['DRAFT'] } };
+
+  it('creates and updates a draft with raw MIME and threadId, and deletes it', async () => {
+    const { provider, calls } = providerWith(() => ({ data: draft }));
+    const outgoing = { from: 'me@example.com', to: [], subject: 'Hi', text: 'x', threadId: 'T3' };
+    await expect(provider.createDraft(outgoing)).resolves.toEqual({ draftId: 'r-5', messageId: 'dm1', threadId: 'T3' });
+    await expect(provider.updateDraft('r-5', outgoing)).resolves.toEqual({ draftId: 'r-5', messageId: 'dm1', threadId: 'T3' });
+    await expect(provider.deleteDraft('r-5')).resolves.toBeUndefined();
+
+    expect(calls[0]?.url).toMatch(/\/gmail\/v1\/users\/me\/drafts$/);
+    expect(calls[1]?.url).toMatch(/\/gmail\/v1\/users\/me\/drafts\/r-5$/);
+    expect(calls[2]?.url).toMatch(/\/gmail\/v1\/users\/me\/drafts\/r-5$/);
+    const body = (calls[0] as RequestOptions & { data?: { message: { raw: string; threadId?: string } } }).data;
+    expect(body?.message.threadId).toBe('T3');
+    const mime = Buffer.from(body?.message.raw ?? '', 'base64url').toString('utf8');
+    expect(mime).toContain('Subject: Hi\r\n');
+    expect(mime).not.toContain('To:');
+  });
+
+  it('rejects a response without the draft or message ID as upstream', async () => {
+    const { provider } = providerWith(() => ({ data: { id: 'r-5' } }));
+    await expect(provider.createDraft({ from: 'a@x.io', to: [], subject: '', text: '' })).rejects.toMatchObject({
+      kind: 'upstream',
+    });
+  });
+});

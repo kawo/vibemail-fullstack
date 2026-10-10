@@ -1,4 +1,5 @@
 import { renewWatches, verifyCronSecret } from '../cron/renewWatch';
+import { createDraft, deleteDraft, updateDraft } from '../drafts';
 import { ApiError } from '../middleware/errors';
 import { requireUser } from '../middleware/auth';
 import {
@@ -10,8 +11,11 @@ import {
   verifyStateCookie,
 } from '../middleware/oauthState';
 import { toMessageDTO } from '../messages/dto';
+import { updateMessageLabels } from '../messages/labels';
 import { listMessages, parseListQuery } from '../messages/list';
 import { markMessageRead } from '../messages/markRead';
+import { parseSearchQuery, searchMessages } from '../messages/search';
+import { getThread } from '../messages/thread';
 import { initiateOAuth } from '../providers/gmail/auth';
 import { sendForUser } from '../send';
 import { signInWithGoogle } from '../services/gmailAccount';
@@ -37,8 +41,37 @@ export interface Handlers {
   listMessages: Handler;
   sendMessage: Handler;
   markRead: Handler;
+  /** v1.1, CONTRACT.md §4.7–§4.12. */
+  updateLabels: Handler;
+  getThread: Handler;
+  searchMessages: Handler;
+  createDraft: Handler;
+  updateDraft: Handler;
+  deleteDraft: Handler;
   gmailWebhook: Handler;
   renewWatch: Handler;
+}
+
+/**
+ * The path segment after `after`, URL-decoded: `/api/v1/messages/{id}/read` → `{id}` for
+ * `after = 'messages'`. A missing or undecodable segment is `VALIDATION_FAILED` on `field`.
+ */
+export function pathParam(request: Request, after: string, field: string): string {
+  const segments = new URL(request.url).pathname.split('/').filter(Boolean);
+  const at = segments.indexOf(after);
+  const raw = at >= 0 ? segments[at + 1] : undefined;
+  let value = '';
+  try {
+    value = raw ? decodeURIComponent(raw) : '';
+  } catch {
+    value = '';
+  }
+  if (!value) {
+    throw new ApiError('VALIDATION_FAILED', `missing ${field}`, {
+      details: { issues: [{ field, message: 'required' }] },
+    });
+  }
+  return value;
 }
 
 export function createHandlers(getDeps: () => AppDeps): Handlers {
@@ -191,22 +224,42 @@ export function createHandlers(getDeps: () => AppDeps): Handlers {
 
     markRead: authenticated(async (deps, user, request) => {
       // Path: /api/v1/messages/{id}/read
-      const segments = new URL(request.url).pathname.split('/').filter(Boolean);
-      const at = segments.indexOf('messages');
-      const raw = at >= 0 ? segments[at + 1] : undefined;
-      let id = '';
-      try {
-        id = raw ? decodeURIComponent(raw) : '';
-      } catch {
-        id = '';
-      }
-      if (!id) {
-        throw new ApiError('VALIDATION_FAILED', 'missing message id', {
-          details: { issues: [{ field: 'id', message: 'required' }] },
-        });
-      }
-      const row = await markMessageRead(deps, user.userId, id);
+      const row = await markMessageRead(deps, user.userId, pathParam(request, 'messages', 'id'));
       return jsonResponse({ message: toMessageDTO(row) }, 200);
+    }),
+
+    updateLabels: authenticated(async (deps, user, request) => {
+      // Path: /api/v1/messages/{id}
+      const id = pathParam(request, 'messages', 'id');
+      const row = await updateMessageLabels(deps, user.userId, id, await readJson(request));
+      return jsonResponse({ message: toMessageDTO(row) }, 200);
+    }),
+
+    getThread: authenticated(async (deps, user, request) => {
+      // Path: /api/v1/threads/{threadId}
+      return jsonResponse(await getThread(deps, user.userId, pathParam(request, 'threads', 'threadId')), 200);
+    }),
+
+    searchMessages: authenticated(async (deps, user, request) => {
+      const query = parseSearchQuery(new URL(request.url));
+      return jsonResponse(await searchMessages(deps, user.userId, query), 200);
+    }),
+
+    createDraft: authenticated(async (deps, user, request) => {
+      const draft = await createDraft(deps, user.userId, await readJson(request));
+      return jsonResponse({ draft }, 201);
+    }),
+
+    updateDraft: authenticated(async (deps, user, request) => {
+      // Path: /api/v1/drafts/{draftId}
+      const draftId = pathParam(request, 'drafts', 'draftId');
+      const draft = await updateDraft(deps, user.userId, draftId, await readJson(request));
+      return jsonResponse({ draft }, 200);
+    }),
+
+    deleteDraft: authenticated(async (deps, user, request) => {
+      await deleteDraft(deps, user.userId, pathParam(request, 'drafts', 'draftId'));
+      return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
     }),
 
     async gmailWebhook(request) {

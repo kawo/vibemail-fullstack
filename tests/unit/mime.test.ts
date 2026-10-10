@@ -74,3 +74,11 @@ describe('buildRfc2822 (CONTRACT.md §4.3)', () => {
     expect(Buffer.from(raw, 'base64url').toString('utf8')).toBe('Subject: ??>\r\n\r\nbody');
   });
 });
+
+describe('buildRfc2822 without recipients (CONTRACT.md §4.10)', () => {
+  it('omits the To header for a draft with no recipients', () => {
+    const mime = buildRfc2822({ from: 'me@example.com', to: [], subject: 's', text: 't' }, date);
+    expect(mime).not.toMatch(/^To:/m);
+    expect(mime).toContain('From: me@example.com\r\n');
+  });
+});

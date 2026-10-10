@@ -42,6 +42,7 @@ export {
   createMessagesRepository,
   toMessageRow,
 } from './messages';
+export { deriveStatus } from './status';
 export {
   type ConnectedAccount,
   type ConnectedUserInput,
