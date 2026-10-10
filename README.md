@@ -20,12 +20,18 @@ Sync is **push-driven**. Gmail is read once at connect time (a full sync of the 
 |---|---|---|---|
 | `GET` | `/api/v1/auth/google` | none | Starts Google sign-in and redirects to the consent screen |
 | `GET` | `/api/v1/auth/google/callback` | signed `state` and cookie | Exchanges the code, signs in to Supabase, stores the Gmail tokens, registers the watch, runs the initial sync, then redirects to the frontend |
-| `GET` | `/api/v1/messages?limit&cursor` | Bearer | Lists INBOX messages from the DB, newest first, with cursor pagination |
+| `GET` | `/api/v1/messages?limit&cursor` | Bearer | Lists stored messages from the DB, newest first, with cursor pagination |
 | `POST` | `/api/v1/messages/send` | Bearer | Sends a plain-text message (`{ to, subject, body, threadId? }`) |
 | `POST` | `/api/v1/messages/{id}/read` | Bearer | Marks one message as read |
+| `PATCH` | `/api/v1/messages/{id}` | Bearer | v1.1: changes one message's labels (star, unread, archive, trash, restore) |
+| `GET` | `/api/v1/threads/{threadId}` | Bearer | v1.1: stored messages of one thread, oldest first (DB only) |
+| `GET` | `/api/v1/messages/search?q&limit&cursor` | Bearer | v1.1: searches stored messages (DB only) |
+| `POST` | `/api/v1/drafts` | Bearer | v1.1: creates a Gmail draft |
+| `PATCH` / `DELETE` | `/api/v1/drafts/{draftId}` | Bearer | v1.1: replaces or deletes a draft |
 | `POST` | `/webhook/gmail?token=…` | Pub/Sub token | Receives Gmail push notifications, acks at once and syncs in the background |
 | `GET` | `/api/cron/renew-watch` | `CRON_SECRET` bearer | Daily cron job that renews Gmail watches expiring within 24 h |
 
+- **v1.1** rows are contracted in CONTRACT.md but not implemented yet.
 - **Bearer** means a Supabase access token (HS256), verified locally.
 - **Errors** always use the envelope `{ error: { code, message, retryable, details? } }` (CONTRACT.md §3.3).
 - **Postman:** a collection is in [`docs/vibemail-api.postman_collection.json`](docs/vibemail-api.postman_collection.json).
