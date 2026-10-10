@@ -90,7 +90,7 @@ export type Database = {
           rfc822_message_id?: string | null
           size_estimate: number
           snippet?: string
-          status?: string
+          status: string
           subject?: string | null
           synced_at: string
           thread_id: string
@@ -192,33 +192,33 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
-            attachments: Json
-            bcc_addresses: string[]
-            body_html: string | null
-            body_plain: string | null
-            cc_addresses: string[]
-            created_at: string
-            date_header: string | null
-            from_address: string
-            gmail_id: string
-            history_id: string
-            id: string
-            in_reply_to: string | null
-            internal_date: string
-            is_read: boolean
-            is_starred: boolean
-            label_ids: string[]
-            references: string | null
-            rfc822_message_id: string | null
-            size_estimate: number
-            snippet: string
-            status: string
-            subject: string | null
-            synced_at: string
-            thread_id: string
-            to_address: string[]
-            updated_at: string
-            user_id: string
+          attachments: Json
+          bcc_addresses: string[]
+          body_html: string | null
+          body_plain: string | null
+          cc_addresses: string[]
+          created_at: string
+          date_header: string | null
+          from_address: string
+          gmail_id: string
+          history_id: string
+          id: string
+          in_reply_to: string | null
+          internal_date: string
+          is_read: boolean
+          is_starred: boolean
+          label_ids: string[]
+          references: string | null
+          rfc822_message_id: string | null
+          size_estimate: number
+          snippet: string
+          status: string
+          subject: string | null
+          synced_at: string
+          thread_id: string
+          to_address: string[]
+          updated_at: string
+          user_id: string
         }[]
         SetofOptions: {
           from: "*"
