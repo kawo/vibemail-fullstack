@@ -1,0 +1,128 @@
+/* The compose state gallery: frames of the real sheet, laid out side by side. */
+.gallery {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-xxl) var(--space-lg) 64px;
+}
+
+.gallery-head {
+  max-width: 72ch;
+  margin-bottom: var(--space-xxl);
+}
+
+.gallery-head h1 {
+  margin: 0 0 var(--space-sm);
+  font-size: 38px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.gallery-head p,
+.gallery-intro {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.gallery-head code {
+  color: var(--ink);
+}
+
+.gallery-section {
+  margin-top: var(--space-xxl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--hairline);
+}
+
+.gallery-section h2 {
+  margin: 0 0 var(--space-xs);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.gallery-intro {
+  max-width: 90ch;
+  color: var(--mute);
+  margin-bottom: var(--space-lg);
+}
+
+.frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+  gap: var(--space-xl) var(--space-lg);
+}
+
+.frame {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.frame figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 56px;
+}
+
+.frame-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.frame-index {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  color: var(--accent-text);
+  font-size: 12px;
+}
+
+.frame-note {
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* A phone-height screen: inbox behind, scrim over it, sheet over 72% of it. */
+.frame-screen {
+  position: relative;
+  height: 620px;
+  overflow: hidden;
+  border: 1px solid var(--hairline-strong);
+  background:
+    radial-gradient(60% 50% at 70% 20%, var(--backdrop-bloom), rgba(88, 86, 214, 0) 70%),
+    linear-gradient(180deg, var(--backdrop-top), var(--backdrop-bottom));
+  isolation: isolate;
+}
+
+.frame-inbox .row {
+  cursor: default;
+}
+
+.frame-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  -webkit-backdrop-filter: var(--blur-1);
+  backdrop-filter: var(--blur-1);
+}
+
+.frame-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 76%;
+}

@@ -22,6 +22,8 @@
   --surface-raised: rgba(255, 255, 255, 0.16);
   --scrim: rgba(5, 8, 16, 0.55);
   --glass-tint: rgba(10, 15, 30, 0.72);
+  --sheet-tint: rgba(10, 15, 30, 0.82);
+  --on-accent: #ffffff;
   --hairline: rgba(255, 255, 255, 0.15);
   --glass-edge: rgba(255, 255, 255, 0.17);
   --hairline-strong: rgba(255, 255, 255, 0.2);
@@ -47,6 +49,8 @@
   /* Semantic */
   --accent: #007aff;
   --accent-text: #8ac2ff;
+  --accent-hover: #0056b3;
+  --accent-active: #004085;
   --warning: #ff9f0a;
   --highlight: rgba(255, 159, 10, 0.28);
   --danger: #ff3b30;
@@ -454,6 +458,14 @@ button {
 
 .secondary-btn:active {
   background: var(--surface-card);
+}
+
+.secondary-btn:disabled {
+  background: transparent;
+  border-color: var(--hairline);
+  box-shadow: none;
+  color: var(--ash);
+  cursor: default;
 }
 
 .primary-btn {
@@ -1275,6 +1287,12 @@ mark {
   z-index: 30;
 }
 
+/* The sheet is the most opaque glass in the app: white glass over a dense navy tint, so text
+   fields read cleanly over the dimmed inbox while the inbox still shows through, blurred. */
+.drawer.glass-raised {
+  background: linear-gradient(var(--surface-raised), var(--surface-raised)), var(--sheet-tint);
+}
+
 .drawer {
   position: fixed;
   z-index: 31;
@@ -1308,11 +1326,22 @@ mark {
   }
 }
 
+/* Laid out in place (the state gallery): same sheet, no fixed positioning. */
+.drawer.inline,
+.drawer.inline.expanded {
+  position: relative;
+  inset: auto;
+  transform: none;
+  width: 100%;
+  height: 100%;
+  padding-bottom: 0;
+}
+
 .drawer-head {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm) var(--space-sm) var(--space-sm);
+  padding: var(--space-xs) var(--space-xs) var(--space-sm) var(--space-md);
   border-bottom: 1px solid var(--hairline-strong);
   flex: none;
 }
@@ -1329,13 +1358,17 @@ mark {
 .drawer-title {
   flex: 1;
   display: flex;
-  gap: var(--space-sm);
-  align-items: baseline;
+  flex-direction: column;
   min-width: 0;
-  padding-left: var(--space-xs);
   white-space: nowrap;
   overflow: hidden;
   font-weight: 700;
+  line-height: 18px;
+}
+
+.drawer-title > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Expanding to a centred modal is desktop-only (DESIGN_SPEC.md §3). */
@@ -1344,12 +1377,13 @@ mark {
 }
 
 @media (min-width: 768px) {
-  .expand-btn {
+  .drawer:not(.inline) .expand-btn {
     display: inline-grid;
   }
 }
 
 .save-state {
+  min-height: 16px;
   color: var(--mute);
   font-size: 12px;
   line-height: 16px;
@@ -1363,6 +1397,48 @@ mark {
 
 .save-state .ok {
   color: var(--success);
+}
+
+.drawer-head .secondary-btn {
+  height: 32px;
+}
+
+/* Send: the one accent fill in the app. */
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  height: 32px;
+  min-width: 72px;
+  padding: 0 var(--space-lg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.send-btn:hover {
+  background: var(--accent-hover);
+}
+
+.send-btn:active {
+  background: var(--accent-active);
+}
+
+.send-btn:disabled {
+  background: var(--surface-card);
+  border-color: var(--glass-edge);
+  color: var(--ash);
+  cursor: default;
+}
+
+.close-btn {
+  font-size: 15px;
 }
 
 .pill {
@@ -1398,6 +1474,10 @@ mark {
   flex: none;
 }
 
+.field.invalid {
+  box-shadow: inset 0 -1px 0 var(--danger);
+}
+
 .field label {
   color: var(--mute);
   font-size: 12px;
@@ -1420,6 +1500,12 @@ mark {
   font-weight: 500;
 }
 
+.field input::placeholder,
+.body-field::placeholder {
+  color: var(--row-snippet);
+  font-weight: 400;
+}
+
 .recipients {
   display: flex;
   flex-wrap: wrap;
@@ -1427,7 +1513,7 @@ mark {
   flex: 1;
   align-items: center;
   min-width: 0;
-  padding: 6px 0;
+  padding: 7px 0;
 }
 
 .recipients input {
@@ -1438,7 +1524,7 @@ mark {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  height: 24px;
+  min-height: 24px;
   padding: 0 2px 0 var(--space-sm);
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-sm);
@@ -1446,6 +1532,7 @@ mark {
   font-size: 12px;
   line-height: 16px;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .recipient.invalid {
@@ -1460,9 +1547,27 @@ mark {
   padding: 0 6px;
 }
 
-.body-field {
+/* Reply mode: To is fixed to the replied sender. */
+.field.locked .recipient {
+  padding-right: var(--space-sm);
+  background: transparent;
+  border-style: dashed;
+  color: var(--body);
+}
+
+.body-scroll {
   flex: 1;
-  min-height: 72px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+}
+
+.body-field {
+  flex: none;
+  min-height: 96px;
+  field-sizing: content;
   resize: none;
   background: transparent;
   border: 0;
@@ -1470,7 +1575,53 @@ mark {
   padding: var(--space-md);
   font-size: 14px;
   line-height: 22px;
-  overflow-y: auto;
+}
+
+/* The replied message, below the body and quieter than it. */
+.quote-excerpt {
+  margin: 0 var(--space-md) var(--space-md);
+  padding: var(--space-xs) 0 var(--space-xs) var(--space-md);
+  border-left: 1px solid var(--hairline-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--row-snippet);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* Draft restored: a quiet note and chip under the body, gone after the first edit. */
+.restored-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: auto;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+.restored-note {
+  color: var(--row-snippet);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.restored-chip {
+  height: 24px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  opacity: 0.62;
+  transition: opacity 120ms ease;
+}
+
+.restored-chip:hover,
+.restored-chip:focus-visible {
+  opacity: 1;
 }
 
 .field-error {
@@ -1479,6 +1630,12 @@ mark {
   line-height: 16px;
   padding: var(--space-xs) var(--space-md) var(--space-xs) calc(var(--space-md) + 72px);
   border-bottom: 1px solid var(--hairline);
+}
+
+.body-scroll .field-error {
+  border-bottom: 0;
+  padding-top: 0;
+  padding-left: var(--space-md);
 }
 
 .notice {
@@ -1498,6 +1655,11 @@ mark {
   flex: none;
 }
 
+.notice-text {
+  flex: 1;
+  min-width: 12ch;
+}
+
 .notice.plain {
   border: 0;
   background: transparent;
@@ -1512,10 +1674,6 @@ mark {
 
 .notice.error .text-btn {
   color: var(--ink);
-}
-
-.notice > .text-btn:first-of-type {
-  margin-left: auto;
 }
 
 .fab {
