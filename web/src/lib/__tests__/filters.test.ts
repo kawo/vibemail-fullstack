@@ -24,16 +24,16 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
     expect(ids({ kind: 'label', labelId: 'Label_1' })).toEqual(['c']);
   });
 
-  it('counts each label with the same rule as the filter', () => {
+  it('counts nothing when every loaded message is read', () => {
     const chips: Chip[] = [...FIXED_CHIPS, { kind: 'label', labelId: 'Label_1' }, { kind: 'label', labelId: 'Label_2' }];
     expect(Object.fromEntries(chipCounts(all, chips))).toEqual({
       all: 0,
-      starred: 1,
+      starred: 0,
       drafts: 0,
-      archive: 1,
-      trash: 1,
-      'label:Label_1': 1,
-      'label:Label_2': 1,
+      archive: 0,
+      trash: 0,
+      'label:Label_1': 0,
+      'label:Label_2': 0,
     });
   });
 
@@ -47,11 +47,23 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
     expect(chipCounts(unread, [{ kind: 'all' }]).get('all')).toBe(2);
   });
 
+  it('every label counts only its unread matches, by the filter rule', () => {
+    const mixed = [
+      message({ gmailId: 's1', isRead: false, isStarred: true, labelIds: ['INBOX', 'UNREAD', 'STARRED', 'Label_1'] }),
+      message({ gmailId: 's2', isRead: true, isStarred: true }),
+      message({ gmailId: 'a1', isRead: false, status: 'archived', labelIds: ['UNREAD', 'Label_1'] }),
+      message({ gmailId: 't1', isRead: false, status: 'trash', labelIds: ['TRASH', 'UNREAD', 'Label_1'] }),
+      message({ gmailId: 't2', isRead: true, status: 'trash' }),
+    ];
+    const chips: Chip[] = [{ kind: 'starred' }, { kind: 'archive' }, { kind: 'trash' }, { kind: 'label', labelId: 'Label_1' }];
+    expect(Object.fromEntries(chipCounts(mixed, chips))).toEqual({ starred: 1, archive: 1, trash: 1, 'label:Label_1': 2 });
+  });
+
   it('never shows a zero, and words the count for screen readers', () => {
     expect(showsCount(0)).toBe(false);
     expect(showsCount(2)).toBe(true);
     expect(countNoun({ kind: 'all' }, 1)).toBe('new message');
-    expect(countNoun({ kind: 'starred' }, 2)).toBe('messages');
+    expect(countNoun({ kind: 'starred' }, 2)).toBe('new messages');
     expect(countNoun({ kind: 'drafts' }, 1)).toBe('draft');
   });
 

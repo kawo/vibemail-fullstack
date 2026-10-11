@@ -100,11 +100,10 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 ### Label sidebar
 
 - **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and a toggle in its header collapses it to icons only (56px; names become tooltips, custom labels show a short id like `#12`). Width and mode are remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
-- **Counts.** Every label shows a right-aligned count; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
-  - **All:** how many loaded messages are new (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening one lowers it.
-  - **Drafts:** how many drafts are listed (§4 Drafts), with a `+` (`25+`) while the list has more pages.
-  - **Starred, Archive, Trash and custom labels:** how many loaded messages they match, by the filter's rule.
-  - Message counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they grow as the list pages.
+- **Counts.** Every label shows a right-aligned count of its new mail; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
+  - **All, Starred, Archive, Trash and custom labels:** how many loaded messages they match, by the filter's rule, that are unread (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening or marking a message read lowers every count it was in; marking it unread raises them.
+  - **Drafts:** drafts have no unread state, so it counts the drafts listed (§4 Drafts), in `mute`, with a `+` (`25+`) while the list has more pages.
+  - Message counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they can grow as the list pages.
 - **Fixed labels.** The sidebar always lists five fixed labels, in this order: **All**, **Starred**, **Drafts**, **Archive**, **Trash**. They are present even when they match nothing. Drafts is not a filter: it shows the draft list (§4 Drafts).
 - **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one entry per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
   - The contract has no label-name endpoint, so a custom label shows the label ID.

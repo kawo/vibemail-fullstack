@@ -9,9 +9,8 @@ import { Glyph } from '../ui';
  * The active label is marked with `aria-current`; while a search runs, none is (results span every
  * status), and picking one ends the search.
  *
- * All shows how many loaded messages are new (unread); Drafts, how many drafts are listed (`25+`
- * while more pages are unread); every other label, how many loaded messages it matches.
- * A zero shows nothing. Collapsed, the
+ * Every label shows how many of its loaded messages are new (unread); Drafts, which has no unread
+ * state, how many drafts are listed (`25+` while more pages are unread). A zero shows nothing. Collapsed, the
  * count becomes a small badge on the icon and joins the tooltip.
  */
 export function LabelNav({
@@ -69,7 +68,7 @@ export function LabelNav({
           </span>
           <span className="nav-label">{chipLabel(chip)}</span>
           {counted && (
-            <span className={chip.kind === 'all' ? 'nav-count new' : 'nav-count'}>
+            <span className={chip.kind === 'drafts' ? 'nav-count' : 'nav-count new'}>
               <span className="sr-only">, </span>
               {shown}
               <span className="sr-only">{` ${countNoun(chip, count)}`}</span>

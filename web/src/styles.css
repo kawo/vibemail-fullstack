@@ -458,7 +458,7 @@ button {
   color: var(--body);
 }
 
-/* All counts new mail: bold ink, the way unread rows read. */
+/* New-mail counts (every label but Drafts): bold ink, the way unread rows read. */
 .nav-count.new,
 .nav-item:hover .nav-count.new,
 .nav-item[aria-current='page'] .nav-count.new {
