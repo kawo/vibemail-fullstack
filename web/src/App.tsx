@@ -3,7 +3,7 @@ import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
 import { ComposeButton, InboxView } from './components/inbox';
 import { Sidebar } from './components/sidebar';
-import { InboxUiProvider } from './state/inboxUi';
+import { InboxUiProvider, useInboxUi } from './state/inboxUi';
 import { ThreadView } from './components/thread';
 import { Glyph, Toasts } from './components/ui';
 import { ComposeProvider } from './compose/ComposeContext';
@@ -74,6 +74,7 @@ function ReconnectPanel({ onDismiss }: { onDismiss: () => void }) {
 /** The thread, or (side by side only) a quiet prompt when none is open. */
 function ReadingPane({ threadId }: { threadId: string | null }) {
   const pane = useRef<HTMLElement | null>(null);
+  const { chip, searchActive } = useInboxUi();
   // Each thread opens at its top; the pane scrolls on its own when side by side.
   useEffect(() => {
     pane.current?.scrollTo({ top: 0 });
@@ -83,7 +84,9 @@ function ReadingPane({ threadId }: { threadId: string | null }) {
       {threadId !== null ? (
         <ThreadView key={threadId} threadId={threadId} />
       ) : (
-        <p className="reading-empty">Select a conversation to read it here.</p>
+        <p className="reading-empty">
+          {chip.kind === 'drafts' && !searchActive ? 'Open a draft to keep writing it.' : 'Select a conversation to read it here.'}
+        </p>
       )}
     </section>
   );

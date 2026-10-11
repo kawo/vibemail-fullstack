@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCompose } from '../../compose/ComposeContext';
 import { WIDE, useMediaQuery } from '../../lib/layout';
 import { loadSidebarCollapsed, saveSidebarCollapsed } from '../../lib/sidebarWidth';
+import { loadDrafts, useDrafts } from '../../state/drafts';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { Glyph } from '../ui';
 import { LabelNav } from './LabelNav';
@@ -21,7 +22,20 @@ import { SidebarResizer } from './SidebarResizer';
 export function Sidebar() {
   const compose = useCompose();
   const { chip, selectChip, searchActive, menuOpen, setMenuOpen } = useInboxUi();
-  const { chips, counts } = useLoadedMessages();
+  const { chips, counts: messageCounts } = useLoadedMessages();
+  const drafts = useDrafts();
+  // Drafts are read once at start for this count (CONTRACT.md §4.13); the drawer keeps it current.
+  useEffect(() => {
+    if (drafts.state === 'idle') {
+      void loadDrafts();
+    }
+  }, [drafts.state]);
+  const counts = useMemo(() => {
+    const merged = new Map(messageCounts);
+    merged.set('drafts', drafts.state === 'ready' ? drafts.drafts.length : 0);
+    return merged;
+  }, [messageCounts, drafts.state, drafts.drafts.length]);
+  const openEnded = useMemo(() => new Set(drafts.nextCursor ? ['drafts'] : []), [drafts.nextCursor]);
   const wide = useMediaQuery(WIDE);
   const panel = useRef<HTMLElement | null>(null);
   const asPanel = !wide;
@@ -104,7 +118,7 @@ export function Sidebar() {
         >
           <Glyph name="compose" /> <span className="compose-label">Compose</span>
         </button>
-        <LabelNav chips={chips} counts={counts} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
+        <LabelNav chips={chips} counts={counts} openEnded={openEnded} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
       </aside>
       {wide && <SidebarResizer collapsed={collapsed} />}
     </>

@@ -10,6 +10,7 @@ export function BodyField({
   text,
   quote,
   restoredAt,
+  restoredLabel = 'Draft restored',
   readOnly,
   error,
   inputRef,
@@ -19,6 +20,7 @@ export function BodyField({
   text: string;
   quote: string | null;
   restoredAt: string | null;
+  restoredLabel?: string;
   readOnly: boolean;
   error: string | undefined;
   inputRef?: RefObject<HTMLTextAreaElement | null>;
@@ -52,7 +54,7 @@ export function BodyField({
       )}
       {restoredAt && (
         <div className="restored-row">
-          <span className="restored-note">Draft restored · saved {relativeTime(restoredAt)}</span>
+          <span className="restored-note">{restoredLabel} · saved {relativeTime(restoredAt)}</span>
           <button type="button" className="restored-chip" onClick={onDiscardDraft}>
             Discard draft
           </button>

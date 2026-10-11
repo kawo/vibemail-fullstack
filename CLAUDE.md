@@ -79,7 +79,7 @@ With the Supabase GitHub integration, merging into `main` runs the migration on 
 ## Coding conventions
 
 - **Errors:** every error response uses the CONTRACT.md §3.3 envelope `{ error: { code, message, retryable, details? } }`, with the closed `ErrorCode` union. Do not add codes without updating §3.3.
-- **Pagination:** every list endpoint uses cursor-based pagination. The cursor is opaque base64url keyset `(internal_date DESC, gmail_id DESC)`, and responses return `nextCursor`. No offsets.
+- **Pagination:** every list endpoint uses cursor-based pagination. The cursor is opaque base64url keyset `(internal_date DESC, gmail_id DESC)`, and responses return `nextCursor`. No offsets. The one exception is the draft list (`GET /api/v1/drafts`, CONTRACT.md §4.13): drafts live only in Gmail, so its cursor wraps Gmail's page token.
 - **Paths:** every client endpoint lives under `/api/v1`.
 - **Auth:** JWT Bearer auth on every `/api/v1` endpoint except the two Google sign-in endpoints (CONTRACT.md §4.1).
   - `GET /api/v1/auth/google` takes no auth. It sets a short-lived HttpOnly state cookie and redirects to Google.

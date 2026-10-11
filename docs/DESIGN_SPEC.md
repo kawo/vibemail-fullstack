@@ -20,7 +20,7 @@ This spec describes how each VibeMail Glass view behaves. It relies on [`CONTRAC
   - The frontend never sends `status` in any request body, and never computes a new `status` itself.
   - It changes labels with `PATCH /api/v1/messages/{id}`, then takes `status` from the returned `message`.
 - **`draftId` is server-managed.**
-  - Gmail assigns it, and the client receives it only in a `DraftDTO` returned by `POST /api/v1/drafts` or `PATCH /api/v1/drafts/{draftId}`.
+  - Gmail assigns it, and the client receives it only in a `DraftDTO` returned by `POST /api/v1/drafts`, `PATCH /api/v1/drafts/{draftId}` or `GET /api/v1/drafts` (§4.13, *v1.1*).
   - The client never supplies a `draftId` in a request body and never generates one. It only echoes a received `draftId` back in the path of `PATCH /api/v1/drafts/{draftId}` and `DELETE /api/v1/drafts/{draftId}`.
 - **One message cache.** All views share one client-side cache of `MessageDTO`s keyed by `gmailId`. Any response that returns a `message` replaces the cached entry, so every view shows the server's latest `labelIds`, `status`, `isRead` and `isStarred`.
 - **Stored mail only.** The list, thread view and search show only the messages the backend has stored, never the whole Gmail mailbox. These are the 50 newest INBOX messages at connect time, plus every later change pushed by Gmail.
@@ -100,12 +100,16 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 ### Label sidebar
 
 - **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and a toggle in its header collapses it to icons only (56px; names become tooltips, custom labels show a short id like `#12`). Width and mode are remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
-- **Counts.** Starred, Archive, Trash and each custom label show, right-aligned, how many loaded messages they match, using the same rule as the filter; All and a zero show nothing. Counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they grow as the list pages. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
-- **Fixed labels.** The sidebar always lists four fixed labels, in this order: **All**, **Starred**, **Archive**, **Trash**. They are present even when they match nothing.
+- **Counts.** Every label shows a right-aligned count; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
+  - **All:** how many loaded messages are new (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening one lowers it.
+  - **Drafts:** how many drafts are listed (§4 Drafts), with a `+` (`25+`) while the list has more pages.
+  - **Starred, Archive, Trash and custom labels:** how many loaded messages they match, by the filter's rule.
+  - Message counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they grow as the list pages.
+- **Fixed labels.** The sidebar always lists five fixed labels, in this order: **All**, **Starred**, **Drafts**, **Archive**, **Trash**. They are present even when they match nothing. Drafts is not a filter: it shows the draft list (§4 Drafts).
 - **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one entry per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
   - The contract has no label-name endpoint, so a custom label shows the label ID.
 - **Selection.** Exactly one label is active at a time. The active label has the brightest glass fill and a 1px accent border.
-- **Overflow.** The sidebar scrolls vertically when the labels overflow. The four fixed labels stay first and are never collapsed into a menu.
+- **Overflow.** The sidebar scrolls vertically when the labels overflow. The five fixed labels stay first and are never collapsed into a menu.
 - **From a thread or a search.** Choosing a label returns to the inbox list on that label, ending any search.
 - **Filtering.** Chip behaviour, matching rules and states are specified in §4 (Label filter).
 
@@ -194,8 +198,11 @@ The drawer edits the request fields `to`, `subject`, `body` and `threadId` (§4.
   - A banner reads "Draft restored · saved {updatedAt as relative time}".
   - If `threadId` is set, the reply pill is shown as in reply mode.
 - **Choices.** The banner offers Discard, which deletes the draft as described under User actions. Any edit dismisses the banner.
-- **Limit.** Restore works only on the device that saved the draft: the contract has no endpoint to list or fetch drafts.
+- **Limit.** Restore works only on the device that saved the draft. Drafts saved elsewhere are reached through Drafts (§4), which opens them as below.
 - **Precedence.** Opening a reply while a draft snapshot exists asks "Replace your saved draft?" before entering reply mode.
+- **Opened from Drafts.** Opening a listed draft (§4 Drafts) shows the same state, filled from that `DraftDTO`: the drawer keeps its `draftId`, and the banner reads "Draft · saved {updatedAt as relative time}". The caret goes to the end of the text.
+  - Gmail gives every draft a `threadId`, so it opens as a reply only when it is this device's snapshot of a reply, or when a loaded message has its `threadId`. Otherwise it opens as a new message.
+  - Saving, sending and discarding keep the Drafts list and count current: a saved draft moves to the top, a sent or discarded one leaves.
 
 ### User actions
 
@@ -277,6 +284,7 @@ Client-side only: there is no dedicated endpoint. The filter reads the `status`,
 |---|---|
 | **All** | `status` is not `trash` and not `spam` |
 | **Starred** | `isStarred` is `true` and `status` is not `trash` or `spam` |
+| **Drafts** | none: drafts are never stored messages; it shows the draft list (Drafts, below) |
 | **Archive** | `status` is `archived` |
 | **Trash** | `status` is `trash` |
 | Custom label | `labelIds` contains that label ID and `status` is not `trash` or `spam` |
@@ -313,6 +321,20 @@ Shown when no message matches after the fill stopped with `nextCursor` `null`:
 - **All:** the inbox empty state (§1).
 
 Archive, Trash and custom-label empty states add a subtle line: "Only mail VibeMail has synced appears here." This is because the list holds only stored messages.
+
+### Drafts
+
+Primary endpoint: `GET /api/v1/drafts` (CONTRACT.md §4.13, *v1.1*). It also uses `DELETE /api/v1/drafts/{draftId}` (§4.12) and the compose drawer (§3).
+
+- **What it shows.** Choosing Drafts swaps the message list for the user's Gmail drafts, newest first, under the title "Drafts" and "Updated {relative time}". Drafts live only in Gmail, so this list includes drafts saved in Gmail or on other devices.
+- **When it is read.** Once when the app starts (for the sidebar count), each time Drafts is opened, and on Refresh while it is open; never on a timer. Further pages load near the end of the list with `nextCursor`.
+- **Row.** The inbox row's grid: the drawn `draft` mark where a row has its star, the recipients (display names; "(no recipients)" when `to` is empty) where it has the sender, `updatedAt` as relative time, then `subject` ("(no subject)") — the body's first lines without the quoted reply.
+- **Open.** Tapping a row opens the drawer on that draft (§3 Opened from Drafts). In split view the reading pane reads "Open a draft to keep writing it."
+- **Discard.** The row menu's **Discard draft** calls `DELETE /api/v1/drafts/{draftId}`. The row dims while it is in flight, then leaves with a toast "Draft discarded". `MESSAGE_NOT_FOUND` counts as done; any other error toasts "Couldn't delete the draft in Gmail" and keeps the row.
+- **Search.** Search covers stored messages only; drafts are not searched.
+- **Loading:** skeleton rows; paging shows the inline spinner row.
+- **Errors:** `GMAIL_NOT_CONNECTED` / `GMAIL_TOKEN_REVOKED` → the reconnect panel; any other first-load error → "Couldn't load your drafts" with Retry; a later page → "Couldn't load more · Retry"; `VALIDATION_FAILED` on a page → the list reloads from the start; a failed Refresh keeps the list and toasts "Couldn't refresh your drafts".
+- **Empty:** "No drafts." with the line "Drafts you save here or in Gmail appear here."
 
 ---
 

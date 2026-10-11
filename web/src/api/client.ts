@@ -4,6 +4,7 @@ import type {
   DraftRequest,
   ErrorCode,
   ErrorEnvelope,
+  ListDraftsResponse,
   ListMessagesResponse,
   MessageDTO,
   SearchMessagesResponse,
@@ -148,6 +149,9 @@ export const api = {
 
   send: (request: SendMessageRequest) =>
     call<{ message: MessageDTO }>('POST', '/api/v1/messages/send', { body: request }),
+
+  listDrafts: (cursor?: string, limit = 25, signal?: AbortSignal) =>
+    call<ListDraftsResponse>('GET', `/api/v1/drafts${query({ limit, cursor })}`, signal ? { signal } : {}),
 
   createDraft: (request: DraftRequest) =>
     call<{ draft: DraftDTO }>('POST', '/api/v1/drafts', { body: request, quietReconnect: true }),

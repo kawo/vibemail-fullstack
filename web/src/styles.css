@@ -458,6 +458,14 @@ button {
   color: var(--body);
 }
 
+/* All counts new mail: bold ink, the way unread rows read. */
+.nav-count.new,
+.nav-item:hover .nav-count.new,
+.nav-item[aria-current='page'] .nav-count.new {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 @media (min-width: 768px) {
   .shell {
     display: grid;
@@ -992,6 +1000,17 @@ button {
   .row .star.off {
     opacity: var(--star-off-opacity);
   }
+}
+
+/* A draft row: the draft mark sits where a message row has its star, in mute like the meta. */
+.row .draft-mark {
+  grid-area: star;
+  align-self: start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  color: var(--mute);
 }
 
 /* Row hierarchy, strongest first: sender (14px, full white, medium), subject (13px, softer

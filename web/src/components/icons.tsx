@@ -1,6 +1,6 @@
 /**
  * VibeMail's drawn icons, for the symbols JetBrains Mono can't draw: nothing in the font reads as
- * archive, trash, inbox or attachment, and the Google Fonts subsets the app loads lack ★ ☆ ↻ ≡ ● ○,
+ * archive, trash, inbox, draft or attachment, and the Google Fonts subsets the app loads lack ★ ☆ ↻ ≡ ● ○,
  * so browsers would draw those from whatever system font they have.
  *
  * One set of rules, so they sit with the monospaced text: a 16px grid, a 1.5px stroke in
@@ -15,6 +15,8 @@ const ICONS = {
   archive: { d: 'M2.25 3.25h11.5v3H2.25z M3.25 6.25v6.5h9.5v-6.5 M6.25 8.75h3.5' },
   // A bin: lid, handle, tapered body with two ribs.
   trash: { d: 'M2.5 4.25h11 M6 4.25v-1.5h4v1.5 M4 4.25l.75 9h6.5l.75-9 M6.75 6.75v4 M9.25 6.75v4' },
+  // A page with a folded corner and two lines of writing: an unsent draft.
+  draft: { d: 'M3.75 1.75h5.75l2.75 2.75v9.75h-8.5z M9.5 1.75v2.75h2.75 M6 8h4 M6 10.75h4' },
   // Five points; filled when starred, outlined when not.
   star: { d: 'M8 2.1 9.62 6.38 14.18 6.59 10.62 9.45 11.82 13.86 8 11.35 4.18 13.86 5.38 9.45 1.82 6.59 6.38 6.38Z', filled: true },
   'star-outline': { d: 'M8 2.1 9.62 6.38 14.18 6.59 10.62 9.45 11.82 13.86 8 11.35 4.18 13.86 5.38 9.45 1.82 6.59 6.38 6.38Z' },

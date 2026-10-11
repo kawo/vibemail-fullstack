@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Chip, FIXED_CHIPS, chipCounts, chipLabel, customLabelIds, matchesChip, shouldFill, showsCount } from '../filters';
+import { type Chip, FIXED_CHIPS, chipCounts, chipLabel, countNoun, countText, customLabelIds, matchesChip, shouldFill, showsCount } from '../filters';
 import { message } from './fixtures';
 
 describe('label filter (DESIGN_SPEC.md §4)', () => {
@@ -12,8 +12,8 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
   const all = [inbox, starred, archived, trashed, spam, sent];
   const ids = (chip: Chip) => all.filter((m) => matchesChip(m, chip)).map((m) => m.gmailId);
 
-  it('always has the four fixed chips first, in order', () => {
-    expect(FIXED_CHIPS.map(chipLabel)).toEqual(['All', 'Starred', 'Archive', 'Trash']);
+  it('always has the five fixed labels first, in order', () => {
+    expect(FIXED_CHIPS.map(chipLabel)).toEqual(['All', 'Starred', 'Drafts', 'Archive', 'Trash']);
   });
 
   it('All excludes trash and spam', () => expect(ids({ kind: 'all' })).toEqual(['a', 'b', 'c', 'f']));
@@ -27,8 +27,9 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
   it('counts each label with the same rule as the filter', () => {
     const chips: Chip[] = [...FIXED_CHIPS, { kind: 'label', labelId: 'Label_1' }, { kind: 'label', labelId: 'Label_2' }];
     expect(Object.fromEntries(chipCounts(all, chips))).toEqual({
-      all: 4,
+      all: 0,
       starred: 1,
+      drafts: 0,
       archive: 1,
       trash: 1,
       'label:Label_1': 1,
@@ -36,11 +37,30 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
     });
   });
 
-  it('shows a count on every label but All, and never a zero', () => {
-    expect(showsCount({ kind: 'all' }, 4)).toBe(false);
-    expect(showsCount({ kind: 'trash' }, 0)).toBe(false);
-    expect(showsCount({ kind: 'starred' }, 2)).toBe(true);
-    expect(showsCount({ kind: 'label', labelId: 'Label_1' }, 1)).toBe(true);
+  it('All counts only new (unread) messages, outside trash and spam', () => {
+    const unread = [
+      message({ gmailId: 'u1', isRead: false }),
+      message({ gmailId: 'u2', isRead: false, status: 'archived' }),
+      message({ gmailId: 'u3', isRead: false, status: 'trash' }),
+      message({ gmailId: 'r1', isRead: true }),
+    ];
+    expect(chipCounts(unread, [{ kind: 'all' }]).get('all')).toBe(2);
+  });
+
+  it('never shows a zero, and words the count for screen readers', () => {
+    expect(showsCount(0)).toBe(false);
+    expect(showsCount(2)).toBe(true);
+    expect(countNoun({ kind: 'all' }, 1)).toBe('new message');
+    expect(countNoun({ kind: 'starred' }, 2)).toBe('messages');
+    expect(countNoun({ kind: 'drafts' }, 1)).toBe('draft');
+  });
+
+  it('Drafts never matches a stored message', () => expect(ids({ kind: 'drafts' })).toEqual([]));
+
+  it('writes the count, open-ended while more drafts are unread', () => {
+    expect(countText(3)).toBe('3');
+    expect(countText(25, true)).toBe('25+');
+    expect(countText(1200)).toBe('999+');
   });
 
   it('lists custom labels (Label_*) from loaded messages, sorted, and shows the ID', () => {

@@ -117,6 +117,7 @@ export function ComposeSheet({
           text={view.text}
           quote={view.quote}
           restoredAt={view.restoredAt}
+          {...(view.restoredLabel ? { restoredLabel: view.restoredLabel } : {})}
           readOnly={view.sending}
           error={view.issues.body}
           inputRef={refs.textInput}

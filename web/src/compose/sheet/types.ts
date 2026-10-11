@@ -39,6 +39,8 @@ export interface ComposeView {
   saveStatus: SaveStatus | null;
   /** Draft restored: when it was saved (the chip shows until the first edit). */
   restoredAt: string | null;
+  /** The note's words: "Draft restored" (this device's last draft) or "Draft" (opened from Drafts). */
+  restoredLabel?: string;
   issues: { to?: string; subject?: string; body?: string };
   notice: ComposeNoticeView | null;
   sending: boolean;

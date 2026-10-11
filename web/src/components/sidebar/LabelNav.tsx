@@ -1,4 +1,4 @@
-import { type Chip, chipKey, chipLabel, showsCount } from '../../lib/filters';
+import { type Chip, chipKey, chipLabel, countNoun, countText, showsCount } from '../../lib/filters';
 import { labelMark } from '../../lib/sidebarWidth';
 import { Icon } from '../icons';
 import { Glyph } from '../ui';
@@ -9,12 +9,15 @@ import { Glyph } from '../ui';
  * The active label is marked with `aria-current`; while a search runs, none is (results span every
  * status), and picking one ends the search.
  *
- * Every label but All shows how many loaded messages it matches (none when zero). Collapsed, the
+ * All shows how many loaded messages are new (unread); Drafts, how many drafts are listed (`25+`
+ * while more pages are unread); every other label, how many loaded messages it matches.
+ * A zero shows nothing. Collapsed, the
  * count becomes a small badge on the icon and joins the tooltip.
  */
 export function LabelNav({
   chips,
   counts,
+  openEnded,
   active,
   searching,
   collapsed = false,
@@ -23,6 +26,8 @@ export function LabelNav({
   chips: readonly Chip[];
   /** Matches per label, keyed by `chipKey`. */
   counts?: ReadonlyMap<string, number>;
+  /** Labels whose list has unread pages: the count reads `25+`. */
+  openEnded?: ReadonlySet<string>;
   active: Chip;
   searching: boolean;
   /** Icons only: the name moves to a tooltip; it stays in the button's accessible name. */
@@ -34,8 +39,8 @@ export function LabelNav({
   const item = (chip: Chip) => {
     const current = !searching && chipKey(chip) === chipKey(active);
     const count = counts?.get(chipKey(chip)) ?? 0;
-    const counted = showsCount(chip, count);
-    const shown = count > 999 ? '999+' : String(count);
+    const counted = showsCount(count);
+    const shown = countText(count, openEnded?.has(chipKey(chip)) ?? false);
     return (
       <li key={chipKey(chip)}>
         <button
@@ -50,6 +55,8 @@ export function LabelNav({
               <Icon name="inbox" />
             ) : chip.kind === 'starred' ? (
               <Glyph name="star" className="star-mark" />
+            ) : chip.kind === 'drafts' ? (
+              <Icon name="draft" />
             ) : chip.kind === 'archive' ? (
               <Icon name="archive" />
             ) : chip.kind === 'trash' ? (
@@ -62,10 +69,10 @@ export function LabelNav({
           </span>
           <span className="nav-label">{chipLabel(chip)}</span>
           {counted && (
-            <span className="nav-count">
+            <span className={chip.kind === 'all' ? 'nav-count new' : 'nav-count'}>
               <span className="sr-only">, </span>
               {shown}
-              <span className="sr-only">{count === 1 ? ' message' : ' messages'}</span>
+              <span className="sr-only">{` ${countNoun(chip, count)}`}</span>
             </span>
           )}
         </button>

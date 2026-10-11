@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
-import type { MessageDTO } from '../api/types';
+import type { DraftDTO, MessageDTO } from '../api/types';
 import {
   type ComposeFields,
   type FieldIssue,
@@ -21,6 +21,8 @@ import {
   saveDraftSnapshot,
   saveUnsent,
 } from '../lib/draftStore';
+import { replyThreadId } from '../lib/drafts';
+import { draftGone, draftSaved } from '../state/drafts';
 import { asApiError, store } from '../state/store';
 import type { OpenRequest } from './ComposeContext';
 import { drawerGeometry } from './geometry';
@@ -42,10 +44,18 @@ interface Initial {
   draftId: string | null;
   savedAt: string | null;
   confirm: Confirm;
+  /** Opened from Drafts rather than restored from this device's snapshot. */
+  opened: boolean;
 }
+
+/** Whether VibeMail has stored a message in this thread (a listed draft is then a reply). */
+const hasStoredThread = (threadId: string): boolean => store.inbox.ids.some((id) => store.get(id)?.threadId === threadId);
 
 function initialState(request: OpenRequest): Initial {
   const snapshot = loadDraftSnapshot();
+  if (request.draft) {
+    return { ...openedDraft(request.draft, snapshot), confirm: null, opened: true };
+  }
   if (request.reply) {
     if (snapshot) {
       // "Replace your saved draft?" is asked before entering reply mode.
@@ -55,15 +65,27 @@ function initialState(request: OpenRequest): Initial {
         draftId: snapshot.draftId,
         savedAt: snapshot.updatedAt,
         confirm: { kind: 'replace', reply: request.reply, snapshot },
+        opened: false,
       };
     }
-    return { mode: 'reply', fields: replyFields(request.reply), draftId: null, savedAt: null, confirm: null };
+    return { mode: 'reply', fields: replyFields(request.reply), draftId: null, savedAt: null, confirm: null, opened: false };
   }
   if (snapshot) {
-    return { mode: 'restored', fields: fromDraft(snapshot), draftId: snapshot.draftId, savedAt: snapshot.updatedAt, confirm: null };
+    return { mode: 'restored', fields: fromDraft(snapshot), draftId: snapshot.draftId, savedAt: snapshot.updatedAt, confirm: null, opened: false };
   }
   const unsent = loadUnsent();
-  return { mode: 'default', fields: unsent ?? { to: [], subject: '', body: '' }, draftId: null, savedAt: null, confirm: null };
+  return { mode: 'default', fields: unsent ?? { to: [], subject: '', body: '' }, draftId: null, savedAt: null, confirm: null, opened: false };
+}
+
+/** A draft from the list, in the restored state: its `draftId` is kept for the next save. */
+function openedDraft(draft: DraftDTO, snapshot: DraftSnapshot | null): Omit<Initial, 'confirm' | 'opened'> {
+  const threadId = replyThreadId(draft, snapshot, hasStoredThread);
+  return {
+    mode: 'restored',
+    fields: { to: draft.to, subject: draft.subject, body: draft.body, ...(threadId ? { threadId } : {}) },
+    draftId: draft.draftId,
+    savedAt: draft.updatedAt,
+  };
 }
 
 /** Gmail gives every draft a `threadId`; only one the user replied into makes it a reply. */
@@ -170,7 +192,10 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
       textInput.current?.focus();
       textInput.current?.setSelectionRange(0, 0);
     } else if (init.mode === 'restored') {
-      textInput.current?.focus();
+      // Picking a draft up again: the caret goes to the end of what was written.
+      const field = textInput.current;
+      field?.focus();
+      field?.setSelectionRange(field.value.length, field.value.length);
     } else {
       toInput.current?.focus();
     }
@@ -210,12 +235,14 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
       setDraftId(draft.draftId);
       setSavedAt(draft.updatedAt);
       saveDraftSnapshot(draft, current.threadId);
+      draftSaved(draft);
       clearUnsent();
       setSaveState('saved');
     } catch (error) {
       const apiError = asApiError(error);
       if (apiError.code === 'MESSAGE_NOT_FOUND' && draftIdRef.current) {
         // Deleted elsewhere: the next save creates a new draft.
+        draftGone(draftIdRef.current);
         draftIdRef.current = null;
         setDraftId(null);
         clearDraftSnapshot();
@@ -266,8 +293,11 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
   const deleteDraftQuietly = async (id: string, reportFailure: boolean) => {
     try {
       await api.deleteDraft(id);
+      draftGone(id);
     } catch (error) {
-      if (reportFailure && asApiError(error).code !== 'MESSAGE_NOT_FOUND') {
+      if (asApiError(error).code === 'MESSAGE_NOT_FOUND') {
+        draftGone(id); // Already deleted elsewhere.
+      } else if (reportFailure) {
         store.toast('Couldn’t delete the draft in Gmail');
       }
     }
@@ -461,6 +491,7 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
     quote,
     saveStatus,
     restoredAt: showRestoredBanner && confirm === null ? savedAt : null,
+    ...(init.opened ? { restoredLabel: 'Draft' } : {}),
     issues: { to: issueFor('to'), subject: issueFor('subject'), body: issueFor('body') ?? issueFor('threadId') },
     notice,
     sending,

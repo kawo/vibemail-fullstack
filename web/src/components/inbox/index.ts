@@ -6,6 +6,7 @@
  *   ├─ list title     the active label's name and the sync line
  *   ├─ MessageList    skeletons, errors, empty states, paging rows, pull to refresh
  *   │  └─ MessageRow  one message: star, sender, time, subject — snippet, row menu, swipe
+ *   ├─ (DraftsView, from components/drafts, replaces the list when Drafts is chosen)
  *   └─ (SearchView, from components/search, replaces the filter bar and list while searching)
  *   ComposeButton     phones only: fixed bottom-right (Compose lives in the sidebar elsewhere)
  *

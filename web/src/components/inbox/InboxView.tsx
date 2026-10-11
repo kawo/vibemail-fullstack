@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { chipKey, chipLabel, matchesChip, shouldFill } from '../../lib/filters';
 import { relativeTime } from '../../lib/format';
+import { loadDrafts, useDrafts } from '../../state/drafts';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { loadInbox, loadMore, useStore } from '../../state/store';
+import { DraftsView } from '../drafts';
 import { SearchView } from '../search';
 import { MessageList } from './MessageList';
 import { MIN_QUERY, SearchBar } from './SearchBar';
@@ -11,7 +13,8 @@ import { useNearEnd } from './useNearEnd';
 /**
  * The inbox view (DESIGN_SPEC.md §1): the search bar on top, then the message list for the label
  * chosen in the sidebar (§4). A query of 2+ characters swaps the list for search results (§5).
- * The label and search live in `InboxUiProvider`, shared with the sidebar.
+ * The label and search live in `InboxUiProvider`, shared with the sidebar. Drafts is not a filter:
+ * it swaps the list for the draft list (DraftsView), and Refresh then re-reads the drafts.
  *
  * `covered` is true while a thread is open: the thread replaces this view, which stays mounted so
  * its paging survives the round trip.
@@ -29,10 +32,12 @@ export function InboxView({ covered }: { covered: boolean }) {
     }
   }, [inbox.state]);
 
+  const drafts = useDrafts();
+  const showingDrafts = chip.kind === 'drafts';
   const { loaded } = useLoadedMessages();
   const visible = useMemo(() => loaded.filter((m) => matchesChip(m, chip)), [loaded, chip]);
-  const filling = inbox.state === 'ready' && shouldFill(visible.length, fillPages, inbox.nextCursor) && !inbox.moreError;
-  const lookFurther = inbox.state === 'ready' && fillPages >= 5 && visible.length < 25 && inbox.nextCursor !== null;
+  const filling = !showingDrafts && inbox.state === 'ready' && shouldFill(visible.length, fillPages, inbox.nextCursor) && !inbox.moreError;
+  const lookFurther = !showingDrafts && inbox.state === 'ready' && fillPages >= 5 && visible.length < 25 && inbox.nextCursor !== null;
 
   // Switching labels cancels a fill in progress and starts counting again (§4).
   const key = chipKey(chip);
@@ -55,7 +60,7 @@ export function InboxView({ covered }: { covered: boolean }) {
     if (!filling && !lookFurther && !inbox.moreError) {
       void loadMore();
     }
-  }, inbox.state === 'ready' && inbox.nextCursor !== null && !searchActive);
+  }, inbox.state === 'ready' && inbox.nextCursor !== null && !searchActive && !showingDrafts);
 
   const query = searchText.trim();
 
@@ -64,17 +69,21 @@ export function InboxView({ covered }: { covered: boolean }) {
       <SearchBar
         value={searchText}
         searching={searchActive}
-        refreshing={inbox.refreshing}
-        refreshDisabled={inbox.refreshing || inbox.state === 'loading'}
+        refreshing={showingDrafts ? drafts.refreshing : inbox.refreshing}
+        refreshDisabled={
+          showingDrafts ? drafts.refreshing || drafts.state === 'loading' : inbox.refreshing || inbox.state === 'loading'
+        }
         menuOpen={menuOpen}
         onMenu={() => setMenuOpen(true)}
         onChange={setSearchText}
         onCancel={exitSearch}
-        onRefresh={() => void loadInbox({ refresh: true })}
+        onRefresh={() => void (showingDrafts ? loadDrafts({ refresh: true }) : loadInbox({ refresh: true }))}
       />
 
       {searchActive && query.length >= MIN_QUERY ? (
         <SearchView query={query} />
+      ) : showingDrafts ? (
+        <DraftsView />
       ) : (
         <>
           <div className="status-line">
