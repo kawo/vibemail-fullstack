@@ -83,9 +83,9 @@
   place-items: center;
   width: 20px;
   height: 20px;
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  color: var(--accent-text);
+  color: var(--ink);
   font-size: 12px;
 }
 

@@ -22,6 +22,7 @@
   --surface-raised: rgba(255, 255, 255, 0.16);
   --scrim: rgba(5, 8, 16, 0.55);
   --glass-tint: rgba(10, 15, 30, 0.72);
+  --star-off-opacity: 0.45;
   --sheet-tint: rgba(10, 15, 30, 0.82);
   --on-accent: #ffffff;
   --hairline: rgba(255, 255, 255, 0.15);
@@ -48,7 +49,6 @@
 
   /* Semantic */
   --accent: #007aff;
-  --accent-text: #8ac2ff;
   --accent-hover: #0056b3;
   --accent-active: #004085;
   --chip-active-tint: rgba(0, 122, 255, 0.22);
@@ -67,7 +67,7 @@
   --glass-3: 0 16px 48px rgba(0, 0, 0, 0.4);
   --glass-raised: 0 24px 64px rgba(2, 6, 23, 0.6);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  --unread-glow: inset 2px 0 0 #8ac2ff, -4px 0 12px -4px rgba(138, 194, 255, 0.55);
+  --unread-glow: inset 2px 0 0 #007aff, -4px 0 12px -4px rgba(0, 122, 255, 0.6);
   --blur-1: blur(20px);
   --blur-2: blur(28px);
   --blur-3: blur(40px);
@@ -161,7 +161,7 @@ button {
 }
 
 .glass-raised {
-  background: var(--surface-raised);
+  background: linear-gradient(var(--surface-raised), var(--surface-raised)), var(--glass-tint);
   border: 1px solid var(--hairline-strong);
   box-shadow: var(--glass-highlight), var(--glass-raised);
   -webkit-backdrop-filter: var(--blur-raised);
@@ -358,7 +358,6 @@ button {
 .search .clear-btn {
   min-width: 24px;
   height: 24px;
-  font-size: 13px;
 }
 
 .search .glyph {
@@ -395,7 +394,7 @@ button {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--mute);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
   font-weight: 500;
   flex: none;
@@ -452,7 +451,7 @@ button {
 }
 
 .link-btn:hover {
-  text-decoration-color: var(--accent-text);
+  text-decoration-color: var(--accent);
 }
 
 .secondary-btn {
@@ -633,16 +632,13 @@ button {
 .row .star {
   grid-area: star;
   align-self: start;
-  min-width: 28px;
   height: 20px;
   padding: 0;
-  font-size: 15px;
-  transition: opacity 120ms ease;
 }
 
-/* An unstarred row hides its outlined star until the row is hovered or focused, then shows it
-   at low strength. Touch screens have no hover, so there it rests at low strength. The button
-   stays in the tab order and in the accessibility tree either way. */
+/* In a row the unstarred star is hidden until the row is hovered or focused; then it takes the
+   shared resting look (below). Touch screens have no hover, so there it always rests visible.
+   The button stays in the tab order and in the accessibility tree either way. */
 .row .star.off {
   opacity: 0;
 }
@@ -650,18 +646,13 @@ button {
 .row:hover .star.off,
 .row:focus-within .star.off,
 .row .star.off:focus-visible {
-  opacity: 0.45;
+  opacity: var(--star-off-opacity);
 }
 
 @media (hover: none) {
   .row .star.off {
-    opacity: 0.45;
+    opacity: var(--star-off-opacity);
   }
-}
-
-.row .star.off:hover {
-  opacity: 1;
-  background: transparent;
 }
 
 /* Row hierarchy, strongest first: sender (14px, full white, medium), subject (13px, softer
@@ -733,13 +724,31 @@ button {
   color: var(--stone);
 }
 
+/* The star, identical in inbox rows, search rows, the thread header and message cards:
+   ★ in warning when starred; ☆ in ink at low strength when not, full strength on hover. */
+.star {
+  min-width: var(--size-control-sm);
+  font-size: 16px;
+  line-height: 20px;
+  transition: opacity 120ms ease;
+}
+
 .star.on,
 .star.on:hover {
   color: var(--warning);
+  opacity: 1;
 }
 
 .star.off {
-  color: var(--ash);
+  color: var(--ink);
+  opacity: var(--star-off-opacity);
+}
+
+.star.off:hover,
+.row .star.off:hover {
+  color: var(--ink);
+  background: transparent;
+  opacity: 1;
 }
 
 .badge {
@@ -761,7 +770,7 @@ button {
 }
 
 .badge.sent {
-  color: var(--accent-text);
+  border-color: var(--accent);
 }
 
 .badge.trash,
@@ -772,15 +781,7 @@ button {
 mark {
   background: var(--highlight);
   color: var(--ink);
-  border-radius: 2px;
-}
-
-/* Menus and toasts float over rows of text, where a large blur on a small panel still lets the
-   words behind read through. A navy tint under the white glass keeps them legible; they stay
-   translucent glass, not an opaque fill. */
-.menu.glass-raised,
-.toast.glass-raised {
-  background: linear-gradient(var(--surface-raised), var(--surface-raised)), var(--glass-tint);
+  border-radius: var(--radius-sm);
 }
 
 .menu {
@@ -800,7 +801,7 @@ mark {
   border: 0;
   background: transparent;
   padding: 6px var(--space-sm);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   line-height: 18px;
   color: var(--ink);
@@ -836,7 +837,7 @@ mark {
   top: 12px;
   width: 40%;
   height: 12px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--surface-card);
   box-shadow: 0 20px 0 0 var(--surface-card);
 }
@@ -1026,19 +1027,6 @@ mark {
   flex: 1;
 }
 
-.thread-head .back {
-  font-size: 16px;
-}
-
-.thread-head .star {
-  font-size: 16px;
-}
-
-/* In the header the outlined star is always shown (no hover reveal there). */
-.thread-head .star.off {
-  color: var(--mute);
-}
-
 .read-toggle .glyph {
   font-size: 10px;
   color: var(--mute);
@@ -1049,7 +1037,7 @@ mark {
 }
 
 .read-toggle.on .glyph {
-  color: var(--accent-text);
+  color: var(--accent);
 }
 
 .menu-anchor {
@@ -1090,6 +1078,7 @@ mark {
 
 .card-skeleton {
   height: 56px;
+  background: var(--surface-card);
   border: 1px solid var(--glass-edge);
 }
 
@@ -1136,7 +1125,7 @@ mark {
 }
 
 .avatar.self {
-  color: var(--accent-text);
+  border-color: var(--accent);
 }
 
 .card {
@@ -1167,8 +1156,8 @@ mark {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 500;
   color: var(--row-sender);
 }
@@ -1193,7 +1182,7 @@ mark {
   gap: var(--space-sm);
   color: var(--mute);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -1289,8 +1278,8 @@ mark {
   border-top: 1px solid var(--hairline);
 }
 
-.card-actions .star {
-  font-size: 15px;
+.card-actions .secondary-btn {
+  height: 32px;
 }
 
 /* On a phone the body runs the card's full width under the avatar. */
@@ -1455,7 +1444,7 @@ mark {
   color: var(--on-accent);
   font-size: 14px;
   line-height: 20px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -1474,9 +1463,6 @@ mark {
   cursor: default;
 }
 
-.close-btn {
-  font-size: 15px;
-}
 
 .pill {
   display: inline-flex;
@@ -1484,13 +1470,13 @@ mark {
   gap: var(--space-xs);
   height: 24px;
   padding: 0 2px 0 var(--space-sm);
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: var(--surface-dark-elevated);
+  background: var(--surface-card);
   font-size: 12px;
   line-height: 16px;
   font-weight: 500;
-  color: var(--accent-text);
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -1645,7 +1631,7 @@ mark {
 .restored-chip {
   height: 24px;
   padding: 0 var(--space-sm);
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
   color: var(--ink);
