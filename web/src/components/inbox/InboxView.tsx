@@ -1,30 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MessageDTO } from '../../api/types';
-import { type Chip, FIXED_CHIPS, chipKey, customLabelIds, matchesChip, shouldFill } from '../../lib/filters';
+import { chipKey, chipLabel, matchesChip, shouldFill } from '../../lib/filters';
 import { relativeTime } from '../../lib/format';
+import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { loadInbox, loadMore, useStore } from '../../state/store';
 import { SearchView } from '../search';
-import { LabelFilterBar } from './LabelFilterBar';
 import { MessageList } from './MessageList';
 import { MIN_QUERY, SearchBar } from './SearchBar';
 import { useNearEnd } from './useNearEnd';
 
 /**
- * The inbox view (DESIGN_SPEC.md §1): search bar on top, label filter bar below it (§4), then
- * the message list. A query of 2+ characters swaps the filter bar and list for search results (§5).
- * The Compose button is app-level (`ComposeButton`), so it also floats over the thread view.
+ * The inbox view (DESIGN_SPEC.md §1): the search bar on top, then the message list for the label
+ * chosen in the sidebar (§4). A query of 2+ characters swaps the list for search results (§5).
+ * The label and search live in `InboxUiProvider`, shared with the sidebar.
  *
- * `covered` is true while a thread is open: below 1024px the thread replaces this view, which
- * stays mounted so its chip and scroll position survive the round trip.
+ * `covered` is true while a thread is open: the thread replaces this view, which stays mounted so
+ * its paging survives the round trip.
  */
 export function InboxView({ covered }: { covered: boolean }) {
   const s = useStore();
   const { inbox } = s;
-  const [chip, setChip] = useState<Chip>(FIXED_CHIPS[0] ?? { kind: 'all' });
+  const { chip, searchText, searchActive, setSearchText, exitSearch, menuOpen, setMenuOpen } = useInboxUi();
   const [fillPages, setFillPages] = useState(0);
   const fillAbort = useRef<AbortController | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [searchActive, setSearchActive] = useState(false);
 
   useEffect(() => {
     if (inbox.state === 'idle') {
@@ -32,18 +29,19 @@ export function InboxView({ covered }: { covered: boolean }) {
     }
   }, [inbox.state]);
 
-  // `s` is a stable singleton: re-derive whenever the store version changes.
-  const version = s.getVersion();
-  const loaded = useMemo(
-    () => inbox.ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined),
-    [inbox.ids, version, s],
-  );
-  const chips = useMemo(() => [...FIXED_CHIPS, ...customLabelIds(loaded).map((labelId): Chip => ({ kind: 'label', labelId }))], [loaded]);
+  const { loaded } = useLoadedMessages();
   const visible = useMemo(() => loaded.filter((m) => matchesChip(m, chip)), [loaded, chip]);
   const filling = inbox.state === 'ready' && shouldFill(visible.length, fillPages, inbox.nextCursor) && !inbox.moreError;
   const lookFurther = inbox.state === 'ready' && fillPages >= 5 && visible.length < 25 && inbox.nextCursor !== null;
 
-  // A chip with too few loaded matches keeps paging (§4 User actions). Switching chips cancels it.
+  // Switching labels cancels a fill in progress and starts counting again (§4).
+  const key = chipKey(chip);
+  useEffect(() => {
+    fillAbort.current?.abort();
+    setFillPages(0);
+  }, [key]);
+
+  // A label with too few loaded matches keeps paging (§4 User actions).
   useEffect(() => {
     if (!filling || inbox.loadingMore) {
       return;
@@ -53,16 +51,6 @@ export function InboxView({ covered }: { covered: boolean }) {
     void loadMore(controller.signal).then(() => !controller.signal.aborted && setFillPages((n) => n + 1));
   }, [filling, inbox.loadingMore]);
 
-  const selectChip = (next: Chip) => {
-    if (chipKey(next) === chipKey(chip)) {
-      window.scrollTo({ top: 0, behavior: 'smooth' }); // Re-tapping the active chip scrolls to top.
-      return;
-    }
-    fillAbort.current?.abort();
-    setFillPages(0);
-    setChip(next);
-  };
-
   const sentinel = useNearEnd(() => {
     if (!filling && !lookFurther && !inbox.moreError) {
       void loadMore();
@@ -70,18 +58,6 @@ export function InboxView({ covered }: { covered: boolean }) {
   }, inbox.state === 'ready' && inbox.nextCursor !== null && !searchActive);
 
   const query = searchText.trim();
-  const changeSearch = (value: string) => {
-    setSearchText(value);
-    if (value.trim().length >= MIN_QUERY) {
-      setSearchActive(true);
-    } else if (value.trim() === '') {
-      setSearchActive(false);
-    }
-  };
-  const exitSearch = () => {
-    setSearchText('');
-    setSearchActive(false);
-  };
 
   return (
     <div className={covered ? 'list-pane covered' : 'list-pane'}>
@@ -90,7 +66,9 @@ export function InboxView({ covered }: { covered: boolean }) {
         searching={searchActive}
         refreshing={inbox.refreshing}
         refreshDisabled={inbox.refreshing || inbox.state === 'loading'}
-        onChange={changeSearch}
+        menuOpen={menuOpen}
+        onMenu={() => setMenuOpen(true)}
+        onChange={setSearchText}
         onCancel={exitSearch}
         onRefresh={() => void loadInbox({ refresh: true })}
       />
@@ -100,12 +78,12 @@ export function InboxView({ covered }: { covered: boolean }) {
       ) : (
         <>
           <div className="status-line">
+            <h1 className="list-title">{chipLabel(chip)}</h1>
             <p className="synced" aria-live="polite">
               {inbox.state === 'ready' &&
                 (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
             </p>
           </div>
-          <LabelFilterBar chips={chips} active={chip} onSelect={selectChip} />
           <MessageList
             inbox={inbox}
             loadedCount={loaded.length}

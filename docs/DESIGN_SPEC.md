@@ -36,7 +36,7 @@ Primary endpoints:
 
 ### Default state
 
-- **Layout.** A vertical list of glass rows, newest first, as the server orders them (`internalDate` descending). The label filter bar is above it, with **All** active.
+- **Layout.** A vertical list of glass rows, newest first, as the server orders them (`internalDate` descending). The labels are in the sidebar on the left (see Label sidebar below), with **All** active; the list is headed by the active label's name.
 - **Row content.** Each row shows:
   - `fromAddress`, display name only when the raw value has the form `Name <addr>`;
   - `subject` (or "(no subject)" when `null`);
@@ -70,7 +70,7 @@ Primary endpoints:
 
 ### Loading state
 
-- **First load:** eight glass skeleton rows, with a shimmer that sweeps across the frosted surface. The filter bar renders immediately.
+- **First load:** eight glass skeleton rows, with a shimmer that sweeps across the frosted surface. The sidebar renders immediately.
 - **Loading more:** a small spinner row at the end of the list. Existing rows stay interactive.
 - **Refresh:** a pull indicator at the top. The current rows stay visible until the new first page replaces them.
 - **Pending action:** a row with a `PATCH` in flight is dimmed to 60% and ignores further swipes until the request settles.
@@ -97,13 +97,15 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 - **Nothing in the inbox** (`messages` is empty and `lastSyncedAt` is set): "You're all caught up", with the "Synced {relative time}" line.
 - **Empty chip:** an active chip with no matching messages shows that chip's empty state (§4).
 
-### Label filter bar
+### Label sidebar
 
-- **Fixed chips.** The bar always renders four fixed chips, in this order: **All**, **Starred**, **Archive**, **Trash**. They are present even when they match nothing.
-- **Custom chips.** Custom Gmail labels follow, one chip per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
-  - The contract has no label-name endpoint, so a custom chip shows the label ID.
-- **Selection.** Exactly one chip is active at a time. The active chip has the brightest glass fill and a 1px luminous border.
-- **Overflow.** The bar scrolls horizontally when the chips overflow. The four fixed chips stay first and are never collapsed into a menu.
+- **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
+- **Fixed labels.** The sidebar always lists four fixed labels, in this order: **All**, **Starred**, **Archive**, **Trash**. They are present even when they match nothing.
+- **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one entry per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
+  - The contract has no label-name endpoint, so a custom label shows the label ID.
+- **Selection.** Exactly one label is active at a time. The active label has the brightest glass fill and a 1px accent border.
+- **Overflow.** The sidebar scrolls vertically when the labels overflow. The four fixed labels stay first and are never collapsed into a menu.
+- **From a thread or a search.** Choosing a label returns to the inbox list on that label, ending any search.
 - **Filtering.** Chip behaviour, matching rules and states are specified in §4 (Label filter).
 
 ---
@@ -319,13 +321,13 @@ Primary endpoint: `GET /api/v1/messages/search` (§4.9, *v1.1*).
 ### Activation condition
 
 - **When search is active.** The search field is focused and its trimmed text has at least 2 characters. The first request is sent 300 ms after the last keystroke.
-- **Inactive.** Below 2 characters, search is inactive and the inbox list with its filter bar is shown unchanged.
+- **Inactive.** Below 2 characters, search is inactive and the inbox list is shown unchanged.
 - **Leaving search.** Clearing the field (the inline clear button) or pressing Escape ends search and restores the inbox with its previous chip and scroll position.
 - **Query length.** The field accepts at most 200 characters.
 
 ### Default state
 
-- **Layout.** Results replace the inbox list. The label filter bar is hidden while search is active, because results span every `status`.
+- **Layout.** Results replace the inbox list. No label is marked active while search is active, because results span every `status`; choosing one ends the search.
 - **Rows.** Each result row is an inbox row (§1). It also shows a `status` badge when `status` is `archived`, `sent`, `trash` or `spam`. Terms from the query are highlighted in `subject`, `fromAddress` and `snippet`.
 - **Paging.** The first request is `GET /api/v1/messages/search?q={query}&limit=25`.
 

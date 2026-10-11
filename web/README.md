@@ -46,10 +46,10 @@ With `npm run dev` running, `/gallery.html` shows the compose drawer's states an
 | Spec | Code |
 |---|---|
 | Shared rules (auth refresh, reconnect, retry) | `src/api/client.ts`, `src/App.tsx` |
-| §1 Inbox and its label filter bar | `src/components/inbox/` (`InboxView`, `SearchBar`, `LabelFilterBar`, `MessageList`, `MessageRow`, `ComposeButton`) |
+| §1 Inbox, §4 label sidebar | `src/components/inbox/` (`InboxView`, `SearchBar`, `MessageList`, `MessageRow`, `ComposeButton`), `src/components/sidebar/` (`Sidebar`, `LabelNav`), `src/state/inboxUi.tsx` |
 | §2 Thread view | `src/components/thread/` (`ThreadView`, `ThreadHeader`, `MessageCard`, `Avatar`, `ThreadSkeleton`), `HtmlBody.tsx`, `src/lib/thread.ts` |
 | §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` (state, autosave, send), `src/compose/sheet/` (`ComposeSheet`, `ComposeHeader`, `RecipientField`, `BodyField`) |
-| §4 Label filter | `src/lib/filters.ts` |
+| §4 Label filter rules | `src/lib/filters.ts` |
 | §5 Search | `src/components/search/` (`SearchView`, `SearchResultList`); the field is `inbox/SearchBar` |
 | Visual direction (VibeMail Glass design system tokens) | `src/styles.css` |
 

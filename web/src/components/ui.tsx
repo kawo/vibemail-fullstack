@@ -21,6 +21,7 @@ const GLYPHS = {
   alert: '[!]',
   missing: '[-]',
   chevron: '›',
+  menu: '≡',
   dot: '●',
   ring: '○',
 } as const;

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
 import { ComposeButton, InboxView } from './components/inbox';
+import { Sidebar } from './components/sidebar';
+import { InboxUiProvider } from './state/inboxUi';
 import { ThreadView } from './components/thread';
 import { Glyph, Toasts } from './components/ui';
 import { ComposeProvider } from './compose/ComposeContext';
@@ -131,15 +133,21 @@ export function App() {
   const threadId = threadIdOf(path);
   return (
     <ComposeProvider>
-      <main className="app">
-        {/* A thread replaces the inbox. The inbox stays mounted underneath, so its chip and
-            search survive the round trip; the router restores its scroll position. */}
-        <InboxView covered={threadId !== null} />
-        {threadId !== null && <ThreadView key={threadId} threadId={threadId} />}
-      </main>
-      <ComposeButton />
-      <Toasts />
-      {reconnect && <ReconnectPanel onDismiss={() => setReconnect(false)} />}
+      <InboxUiProvider>
+        <div className="shell">
+          <Sidebar />
+          <main className="app">
+            {/* A thread replaces the inbox. The inbox stays mounted underneath, so its paging
+                survives the round trip; the router restores its scroll position. */}
+            <InboxView covered={threadId !== null} />
+            {threadId !== null && <ThreadView key={threadId} threadId={threadId} />}
+          </main>
+        </div>
+        {/* Phones only: the sidebar is hidden there, so Compose also floats bottom-right. */}
+        <ComposeButton />
+        <Toasts />
+        {reconnect && <ReconnectPanel onDismiss={() => setReconnect(false)} />}
+      </InboxUiProvider>
     </ComposeProvider>
   );
 }

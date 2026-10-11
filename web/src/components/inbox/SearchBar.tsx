@@ -13,6 +13,8 @@ export function SearchBar({
   searching,
   refreshing,
   refreshDisabled,
+  menuOpen,
+  onMenu,
   onChange,
   onCancel,
   onRefresh,
@@ -21,13 +23,26 @@ export function SearchBar({
   searching: boolean;
   refreshing: boolean;
   refreshDisabled: boolean;
+  /** Phones: the sidebar is a panel this button opens. Hidden where the sidebar is always shown. */
+  menuOpen: boolean;
+  onMenu: () => void;
   onChange: (value: string) => void;
   onCancel: () => void;
   onRefresh: () => void;
 }) {
   return (
     <header className="topbar">
-      <div className="brand">VibeMail</div>
+      <button
+        type="button"
+        className="icon-btn menu-btn"
+        aria-label="Labels and compose"
+        aria-haspopup="dialog"
+        aria-expanded={menuOpen}
+        aria-controls="sidebar"
+        onClick={onMenu}
+      >
+        <Glyph name="menu" />
+      </button>
       <label className={`search${searching ? ' active' : ''}`}>
         <Glyph name="search" />
         <span className="sr-only">Search mail</span>

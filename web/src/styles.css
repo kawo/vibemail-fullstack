@@ -91,6 +91,7 @@
   --size-control: 36px;
   --size-input: 40px;
   --size-drawer: 560px;
+  --size-sidebar: 232px;
 
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
@@ -173,7 +174,6 @@ button {
   .glass,
   .glass-raised,
   .row,
-  .chip,
   .topbar,
   .thread-head {
     background-color: var(--surface-dark);
@@ -198,13 +198,6 @@ button {
   display: none;
 }
 
-@media (min-width: 920px) {
-  .app {
-    border-left: 1px solid var(--hairline);
-    border-right: 1px solid var(--hairline);
-    min-height: 100dvh;
-  }
-}
 
 /* ---------- Screen transitions ---------- */
 /* Inbox → thread: the inbox slides out left, the thread slides in from the right; back reverses
@@ -285,6 +278,188 @@ button {
   }
 }
 
+/* ---------- Sidebar ---------- */
+/* From 768px: a fixed column on the left with the name, Compose and the labels; the inbox and
+   threads change beside it. On a phone it is a panel that slides in over a scrim. */
+.shell {
+  min-height: 100dvh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-md) var(--space-xl);
+  padding-top: max(env(safe-area-inset-top), var(--space-sm));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding-left: var(--space-xs);
+}
+
+.sidebar .compose-btn {
+  width: 100%;
+}
+
+.label-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-heading {
+  margin: var(--space-lg) 0 var(--space-xs);
+  padding-left: var(--space-sm);
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.nav-empty {
+  margin: 0;
+  padding-left: var(--space-sm);
+  color: var(--row-snippet);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* A label: the same active treatment the filter chips had (accent border, brightest fill). */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.nav-item[aria-current='page'] {
+  background: linear-gradient(var(--chip-active-tint), var(--chip-active-tint)), var(--surface-selected);
+  border-color: var(--accent);
+  box-shadow: var(--glass-highlight), 0 0 12px -4px var(--accent);
+  color: var(--row-sender);
+}
+
+.nav-glyph {
+  width: 16px;
+  flex: none;
+  text-align: center;
+  color: var(--stone);
+}
+
+.nav-glyph .glyph {
+  color: var(--warning);
+}
+
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .shell {
+    display: grid;
+    grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    background: var(--surface-dark-elevated);
+    border-right: 1px solid var(--hairline-strong);
+    box-shadow: var(--glass-highlight);
+    -webkit-backdrop-filter: var(--blur-3);
+    backdrop-filter: var(--blur-3);
+  }
+
+  .menu-btn,
+  .fab {
+    display: none !important;
+  }
+
+  /* The content column starts at the sidebar's edge rather than floating in the middle. */
+  .app {
+    max-width: 1040px;
+    margin: 0;
+    border-right: 1px solid var(--hairline);
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sidebar {
+    position: fixed;
+    z-index: 42;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 84vw);
+    background: linear-gradient(var(--surface-raised), var(--surface-raised)), var(--glass-tint);
+    border-right: 1px solid var(--hairline-strong);
+    box-shadow: var(--glass-highlight), var(--glass-raised);
+    -webkit-backdrop-filter: var(--blur-raised);
+    backdrop-filter: var(--blur-raised);
+    transform: translateX(-104%);
+    visibility: hidden;
+    transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 220ms;
+  }
+
+  .sidebar.open {
+    transform: none;
+    visibility: visible;
+    transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 41;
+    background: var(--scrim);
+    -webkit-backdrop-filter: var(--blur-1);
+    backdrop-filter: var(--blur-1);
+  }
+
+  .nav-item {
+    min-height: 40px;
+  }
+}
+
+/* The active label's name heads the list (the filter bar it replaces used to show it). */
+.list-title {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--row-sender);
+}
+
 /* ---------- Header ---------- */
 .topbar {
   position: sticky;
@@ -322,8 +497,10 @@ button {
 .status-line {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md) 0;
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  border-bottom: 1px solid var(--hairline-strong);
   min-height: 24px;
 }
 
@@ -516,62 +693,6 @@ button {
   padding: 0 var(--space-lg);
   font-size: 14px;
   line-height: 20px;
-}
-
-/* ---------- Filter bar ---------- */
-.filters {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  overflow-x: auto;
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--hairline-strong);
-  scrollbar-width: none;
-}
-
-.filters::-webkit-scrollbar {
-  display: none;
-}
-
-.filters .sep {
-  flex: none;
-  width: 1px;
-  height: 16px;
-  background: var(--hairline);
-}
-
-.chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--size-chip);
-  padding: 0 10px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
-  -webkit-backdrop-filter: var(--blur-1);
-  backdrop-filter: var(--blur-1);
-  color: var(--mute);
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 500;
-}
-
-.chip:hover {
-  color: var(--ink);
-}
-
-/* The active chip: accent border, and the brightest chip fill (white glass with an accent tint). */
-.chip[aria-pressed='true'] {
-  background: linear-gradient(var(--chip-active-tint), var(--chip-active-tint)), var(--surface-selected);
-  border-color: var(--accent);
-  box-shadow: var(--glass-highlight), 0 0 12px -4px var(--accent);
-  color: var(--row-sender);
-}
-
-.chip .glyph {
-  color: var(--warning);
 }
 
 /* ---------- Message list ---------- */
@@ -1821,10 +1942,6 @@ mark {
   .topbar .icon-btn {
     min-width: 40px;
     height: 40px;
-  }
-
-  .chip {
-    height: 32px;
   }
 
   .drawer-head .icon-btn,
