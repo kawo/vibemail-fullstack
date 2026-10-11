@@ -83,7 +83,6 @@
   --size-control-sm: 28px;
   --size-control: 36px;
   --size-input: 40px;
-  --size-list-pane: 400px;
   --size-drawer: 560px;
 
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
@@ -175,64 +174,107 @@ button {
 }
 
 /* ---------- Layout ---------- */
+/* One screen at a time: the inbox, or a thread in its place. */
 .app {
   max-width: 920px;
   margin: 0 auto;
   padding: 0 0 calc(88px + env(safe-area-inset-bottom));
+  view-transition-name: stage;
 }
 
 .hidden {
   display: none !important;
 }
 
-/* Below 1024px the thread replaces the list; the list stays mounted to keep chip and scroll. */
+/* The inbox stays mounted under an open thread, keeping its chip and search. */
 .list-pane.covered {
   display: none;
 }
 
-.reading-pane {
-  min-width: 0;
-}
-
-.reading-empty {
-  display: none;
-}
-
-@media (min-width: 1024px) {
+@media (min-width: 920px) {
   .app {
-    max-width: none;
-    display: grid;
-    grid-template-columns: var(--size-list-pane) minmax(0, 1fr);
-    align-items: start;
-    padding-bottom: 0;
-  }
-
-  .list-pane {
+    border-left: 1px solid var(--hairline);
+    border-right: 1px solid var(--hairline);
     min-height: 100dvh;
-    padding-bottom: 88px;
-    border-right: 1px solid var(--hairline-strong);
   }
+}
 
-  .list-pane.covered {
-    display: block;
+/* ---------- Screen transitions ---------- */
+/* Inbox → thread: the inbox slides out left, the thread slides in from the right; back reverses
+   it. Driven by the router through View Transitions; only the stage moves, so the backdrop,
+   the Compose button and toasts hold still. */
+.fab {
+  view-transition-name: compose-button;
+}
+
+.toasts {
+  view-transition-name: toasts;
+}
+
+::view-transition-old(stage),
+::view-transition-new(stage) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+:root[data-nav='forward']::view-transition-old(stage) {
+  animation-name: vm-out-left;
+}
+
+:root[data-nav='forward']::view-transition-new(stage) {
+  animation-name: vm-in-right;
+}
+
+:root[data-nav='back']::view-transition-old(stage) {
+  animation-name: vm-out-right;
+}
+
+:root[data-nav='back']::view-transition-new(stage) {
+  animation-name: vm-in-left;
+}
+
+/* Without View Transitions, only the incoming screen slides. */
+:root[data-nav-fallback='forward'] .thread-pane {
+  animation: vm-in-right 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+:root[data-nav-fallback='back'] .list-pane {
+  animation: vm-in-left 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes vm-out-left {
+  to {
+    transform: translateX(-24%);
+    opacity: 0;
   }
+}
 
-  /* The list scrolls with the window; the reading pane holds still and scrolls on its own. */
-  .reading-pane {
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-bottom: 96px;
+@keyframes vm-in-right {
+  from {
+    transform: translateX(24%);
+    opacity: 0;
   }
+}
 
-  .reading-empty {
-    display: grid;
-    place-items: center;
-    height: 100%;
-    color: var(--mute);
-    font-size: 13px;
+@keyframes vm-out-right {
+  to {
+    transform: translateX(24%);
+    opacity: 0;
+  }
+}
+
+@keyframes vm-in-left {
+  from {
+    transform: translateX(-24%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(stage),
+  ::view-transition-new(stage) {
+    animation: none;
   }
 }
 
@@ -931,26 +973,80 @@ mark {
   backdrop-filter: var(--blur-3);
 }
 
-.thread-head h1 {
-  margin: 0 0 0 var(--space-xs);
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 700;
+.thread-head .spacer {
   flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.thread-head .back {
+  font-size: 16px;
+}
+
+.thread-head .star {
+  font-size: 16px;
+}
+
+/* In the header the outlined star is always shown (no hover reveal there). */
+.thread-head .star.off {
+  color: var(--mute);
+}
+
+.read-toggle .glyph {
+  font-size: 10px;
+  color: var(--mute);
+}
+
+.read-toggle.on {
+  color: var(--ink);
+}
+
+.read-toggle.on .glyph {
+  color: var(--accent-text);
+}
+
+.menu-anchor {
+  position: relative;
+}
+
+.thread-head .menu {
+  top: 34px;
+  right: 0;
+  min-width: 240px;
 }
 
 .thread-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
+}
+
+/* The subject: the page heading (title-sm), wrapping rather than truncating. */
+.thread-title {
+  margin: 0 0 var(--space-sm);
+  padding: 0 var(--space-xs);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  color: var(--row-sender);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.title-skeleton {
+  height: 28px;
+  width: 60%;
+  margin: 0 var(--space-xs) var(--space-sm);
+  border: 0;
+}
+
+.card-skeleton {
+  height: 56px;
+  border: 1px solid var(--glass-edge);
 }
 
 .banner {
+  display: flex;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   color: var(--body);
   font-size: 12px;
@@ -961,6 +1057,39 @@ mark {
   box-shadow: none;
 }
 
+.banner .glyph {
+  color: var(--stone);
+}
+
+/* Avatar: initials in a circle (radius-full is reserved for these). */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--surface-selected);
+  border: 1px solid var(--hairline-strong);
+  color: var(--row-sender);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.avatar.md {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.avatar.sm {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.avatar.self {
+  color: var(--accent-text);
+}
+
 .card {
   padding: 0;
 }
@@ -969,13 +1098,19 @@ mark {
   margin-left: 48px;
 }
 
+/* Collapsed: avatar · sender · snippet · time · chevron, on one line. */
 .card-head {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
-  gap: var(--space-md);
-  align-items: baseline;
-  padding: var(--space-sm) var(--space-md);
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr) auto auto;
+  gap: var(--space-sm);
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
   cursor: pointer;
+}
+
+.card-head:hover .chevron {
+  color: var(--ink);
 }
 
 .card-head .who {
@@ -986,7 +1121,11 @@ mark {
   font-size: 13px;
   line-height: 18px;
   font-weight: 500;
-  color: var(--charcoal);
+  color: var(--row-sender);
+}
+
+.card-head .who.unread {
+  font-weight: 700;
 }
 
 .card-head .collapsed-snippet {
@@ -994,7 +1133,7 @@ mark {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--mute);
+  color: var(--row-snippet);
   font-size: 13px;
   line-height: 18px;
 }
@@ -1009,19 +1148,37 @@ mark {
   white-space: nowrap;
 }
 
+.chevron {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  color: var(--mute);
+  font-size: 16px;
+  transition: transform 160ms ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Expanded: a 32px avatar on the left, sender and time on one line, everything else below. */
 .card.expanded .card-head {
-  padding: var(--space-md) var(--space-lg) 2px;
+  grid-template-columns: auto minmax(0, 1fr) 0 auto auto;
+  padding: var(--space-md) var(--space-sm) var(--space-xs) var(--space-md);
 }
 
 .card.expanded .card-head .who {
   font-size: 14px;
   line-height: 20px;
-  font-weight: 700;
-  color: var(--ink);
+}
+
+.card-main {
+  padding-left: calc(var(--space-md) + 32px + var(--space-sm));
+  padding-right: var(--space-lg);
 }
 
 .card .addr {
-  padding: 0 var(--space-lg) var(--space-sm);
+  padding-bottom: var(--space-sm);
   color: var(--mute);
   font-size: 12px;
   line-height: 16px;
@@ -1033,14 +1190,14 @@ mark {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   margin: 0;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md) 0;
   color: var(--body);
   font-size: 14px;
   line-height: 22px;
 }
 
 .card .html-body {
-  padding: var(--space-md) var(--space-lg) 0;
+  padding: var(--space-md) 0 0;
 }
 
 /* Sender HTML is designed for a light page, so it keeps a light sheet inside the glass card. */
@@ -1056,7 +1213,7 @@ mark {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-xs) var(--space-lg) var(--space-md);
+  padding: 0 0 var(--space-md);
 }
 
 .attachment {
@@ -1078,9 +1235,34 @@ mark {
 .card-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0 var(--space-md);
   border-top: 1px solid var(--hairline);
+}
+
+.card-actions .star {
+  font-size: 15px;
+}
+
+/* On a phone the body runs the card's full width under the avatar. */
+@media (max-width: 560px) {
+  .card-main {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+
+  .card.sent {
+    margin-left: 24px;
+  }
+
+  /* The snippet keeps its grid cell but gets no width, so time and chevron stay in place. */
+  .card-head {
+    grid-template-columns: auto minmax(0, 1fr) 0 auto auto;
+  }
+
+  .card-head .collapsed-snippet {
+    visibility: hidden;
+  }
 }
 
 /* ---------- Compose drawer ---------- */

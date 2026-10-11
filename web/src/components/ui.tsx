@@ -20,6 +20,9 @@ const GLYPHS = {
   done: '[x]',
   alert: '[!]',
   missing: '[-]',
+  chevron: '›',
+  dot: '●',
+  ring: '○',
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

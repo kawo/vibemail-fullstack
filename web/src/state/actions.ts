@@ -75,17 +75,24 @@ export async function move(message: MessageDTO, kind: Move, options: { undo?: bo
   return result !== null;
 }
 
-/** Opening an unread message marks it read without waiting (§1, §2). */
-export function markReadInBackground(message: MessageDTO): void {
+/** Marks a message read through `POST /api/v1/messages/{id}/read`; true when it succeeded. */
+export async function markRead(message: MessageDTO): Promise<boolean> {
   if (message.isRead) {
-    return;
+    return true;
   }
   store.setOverride(message.gmailId, { isRead: true });
-  api
-    .markRead(message.gmailId)
-    .then(({ message: updated }) => store.upsert(updated))
-    .catch((error: unknown) => {
-      store.setOverride(message.gmailId, null);
-      reportFailure(asApiError(error), message.gmailId);
-    });
+  try {
+    const { message: updated } = await api.markRead(message.gmailId);
+    store.upsert(updated);
+    return true;
+  } catch (error) {
+    store.setOverride(message.gmailId, null);
+    reportFailure(asApiError(error), message.gmailId);
+    return false;
+  }
+}
+
+/** Opening an unread message marks it read without waiting (§1, §2). */
+export function markReadInBackground(message: MessageDTO): void {
+  void markRead(message);
 }

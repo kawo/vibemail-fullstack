@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
 import { ComposeButton, InboxView } from './components/inbox';
-import { ThreadView } from './components/ThreadView';
+import { ThreadView } from './components/thread';
 import { Glyph, Toasts } from './components/ui';
 import { ComposeProvider } from './compose/ComposeContext';
 import { navigate, threadIdOf, usePath } from './router';
@@ -91,7 +91,7 @@ export function App() {
         if (result.initialSync === 'failed') {
           store.toast('Your first sync didn’t finish. New mail will still arrive as it comes in.', { ttl: 8000 });
         }
-        navigate('/');
+        navigate('/', { animate: false });
         setAuth('signed-in');
         return;
       }
@@ -132,16 +132,10 @@ export function App() {
   return (
     <ComposeProvider>
       <main className="app">
-        {/* The inbox stays mounted while a thread is open, keeping its chip and scroll position.
-            From 1024px the two sit side by side; below that the thread covers the list. */}
+        {/* A thread replaces the inbox. The inbox stays mounted underneath, so its chip and
+            search survive the round trip; the router restores its scroll position. */}
         <InboxView covered={threadId !== null} />
-        <section className="reading-pane" aria-label="Conversation">
-          {threadId !== null ? (
-            <ThreadView key={threadId} threadId={threadId} />
-          ) : (
-            <p className="reading-empty">Select a conversation to read it here.</p>
-          )}
-        </section>
+        {threadId !== null && <ThreadView key={threadId} threadId={threadId} />}
       </main>
       <ComposeButton />
       <Toasts />
