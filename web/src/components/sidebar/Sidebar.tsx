@@ -1,25 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCompose } from '../../compose/ComposeContext';
+import { WIDE, useMediaQuery } from '../../lib/layout';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { Glyph } from '../ui';
 import { LabelNav } from './LabelNav';
-
-const WIDE = '(min-width: 768px)';
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches ?? true);
-  useEffect(() => {
-    const list = window.matchMedia?.(query);
-    if (!list) {
-      return;
-    }
-    const update = () => setMatches(list.matches);
-    update();
-    list.addEventListener('change', update);
-    return () => list.removeEventListener('change', update);
-  }, [query]);
-  return matches;
-}
 
 /**
  * The left sidebar: product name, Compose, and the labels (DESIGN_SPEC.md §4).

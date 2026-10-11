@@ -1,14 +1,18 @@
 import { useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
+import { SPLIT, matches } from './lib/layout';
 
 /**
  * A minimal history router: `/`, `/thread/{threadId}` and `/auth/callback`.
  *
- * Moving between the inbox and a thread is animated: the inbox slides out to the left and the
+ * Below 1100px a thread replaces the inbox, animated: the inbox slides out to the left and the
  * thread slides in from the right, and the reverse on the way back (styles.css, "Screen
  * transitions"). Browsers with View Transitions animate both screens; others slide the incoming
  * screen only. Reduced motion turns it off. Each screen's scroll position is remembered, so going
  * back lands where the inbox was left.
+ *
+ * From 1100px the thread opens in the reading pane beside the list: nothing slides, and the
+ * list keeps its scroll position.
  */
 
 const listeners = new Set<() => void>();
@@ -30,20 +34,26 @@ function reducedMotion(): boolean {
 
 /** Commits the new path to React synchronously, then restores that screen's scroll. */
 function commit(path: string): void {
-  scrollByPath.set(currentPath, window.scrollY);
+  // Side by side, the list stays on screen: its scroll belongs to it, not to the route.
+  const split = matches(SPLIT);
+  if (!split) {
+    scrollByPath.set(currentPath, window.scrollY);
+  }
   currentPath = path;
   flushSync(() => {
     for (const listener of listeners) {
       listener();
     }
   });
-  window.scrollTo(0, scrollByPath.get(path) ?? 0);
+  if (!split) {
+    window.scrollTo(0, scrollByPath.get(path) ?? 0);
+  }
 }
 
 function transition(from: string, to: string, animate: boolean): void {
   const direction = isThreadPath(to) && !isThreadPath(from) ? 'forward' : !isThreadPath(to) && isThreadPath(from) ? 'back' : null;
   const root = document.documentElement;
-  if (!animate || direction === null || reducedMotion()) {
+  if (!animate || direction === null || reducedMotion() || matches(SPLIT)) {
     commit(to);
     return;
   }

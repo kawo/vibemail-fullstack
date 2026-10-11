@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SPLIT, useMediaQuery } from '../../lib/layout';
 import { Glyph } from '../ui';
 
 /**
@@ -22,6 +23,8 @@ export function ThreadHeader({
   onBack: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Beside the list the thread is closed, not left: an x instead of a back arrow.
+  const split = useMediaQuery(SPLIT);
   const menu = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -43,8 +46,8 @@ export function ThreadHeader({
 
   return (
     <div className="thread-head">
-      <button type="button" className="icon-btn back" aria-label="Back to inbox" onClick={onBack}>
-        <Glyph name="back" />
+      <button type="button" className="icon-btn back" aria-label={split ? 'Close conversation' : 'Back to inbox'} onClick={onBack}>
+        <Glyph name={split ? 'close' : 'back'} />
       </button>
       <span className="spacer" />
       {controls && (

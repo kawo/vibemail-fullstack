@@ -119,6 +119,7 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
 
 ### Default state
 
+- **Placement.** From 1100px wide, the thread opens in a reading pane beside the message list, and the opened row stays highlighted; the header's close control empties the pane. Narrower, the thread replaces the list, sliding in from the right, with a back control.
 - **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox.
 - **Message cards.** One glass card per message, oldest first. The newest message is expanded and the earlier ones are collapsed.
   - **Collapsed card:** `fromAddress`, `snippet` and `internalDate`.

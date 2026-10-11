@@ -92,6 +92,7 @@
   --size-input: 40px;
   --size-drawer: 560px;
   --size-sidebar: 232px;
+  --size-list-pane: clamp(340px, 30vw, 440px);
 
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
@@ -193,9 +194,60 @@ button {
   display: none !important;
 }
 
-/* The inbox stays mounted under an open thread, keeping its chip and search. */
+/* The inbox stays mounted under an open thread, keeping its paging. */
 .list-pane.covered {
   display: none;
+}
+
+.reading-pane.empty-pane,
+.reading-empty {
+  display: none;
+}
+
+/* ≥1100px (lib/layout.ts SPLIT): sidebar · list · reading pane. The list scrolls with the page;
+   the reading pane holds still beside it and scrolls on its own. Nothing slides here. */
+@media (min-width: 1100px) {
+  .shell > .app {
+    display: grid;
+    grid-template-columns: var(--size-list-pane) minmax(0, 1fr);
+    align-items: start;
+    max-width: none;
+    padding-bottom: 0;
+    border-right: 0;
+  }
+
+  .list-pane,
+  .list-pane.covered {
+    display: block;
+    min-height: 100dvh;
+    padding-bottom: 88px;
+    border-right: 1px solid var(--hairline-strong);
+  }
+
+  .reading-pane,
+  .reading-pane.empty-pane {
+    display: block;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .reading-pane .thread-pane {
+    padding-bottom: 96px;
+  }
+
+  .reading-empty {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    margin: 0;
+    color: var(--mute);
+    font-size: 13px;
+    line-height: 20px;
+  }
+
 }
 
 
