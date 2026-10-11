@@ -27,7 +27,7 @@ export function BodyField({
 }) {
   const id = useId();
   return (
-    <div className="body-scroll">
+    <div className="body-area">
       <textarea
         ref={inputRef}
         className="body-field"

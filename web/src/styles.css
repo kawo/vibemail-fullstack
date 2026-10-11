@@ -1537,6 +1537,10 @@ mark {
   align-items: center;
   min-width: 0;
   padding: 7px 0;
+  /* A long recipient list scrolls in place (about three rows of tags) instead of pushing the
+     body away. */
+  max-height: 96px;
+  overflow-y: auto;
 }
 
 .recipients input {
@@ -1578,18 +1582,28 @@ mark {
   color: var(--body);
 }
 
-.body-scroll {
+/* Below the pinned header, the reply tag, To, Subject and body scroll together. The body keeps
+   at least four lines, so it can always be scrolled to and typed in, however tall the To field
+   gets or however little room the keyboard leaves. */
+.compose-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
+  scroll-padding-block: var(--space-sm);
+}
+
+.body-area {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .body-field {
   flex: none;
-  min-height: 96px;
+  min-height: calc(4 * 22px + 2 * var(--space-md));
   field-sizing: content;
   resize: none;
   background: transparent;
@@ -1655,7 +1669,7 @@ mark {
   border-bottom: 1px solid var(--hairline);
 }
 
-.body-scroll .field-error {
+.body-area .field-error {
   border-bottom: 0;
   padding-top: 0;
   padding-left: var(--space-md);
@@ -1785,3 +1799,47 @@ mark {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ---------- Touch screens ---------- */
+/* Fingers need bigger targets than pointers. Visible sizes stay the same; the tappable area
+   grows to at least 40px. */
+@media (pointer: coarse) {
+  .row .star,
+  .row .meta .more {
+    position: relative;
+  }
+
+  .row .star::after,
+  .row .meta .more::after {
+    content: '';
+    position: absolute;
+    inset: -10px -6px;
+  }
+
+  .thread-head .icon-btn,
+  .thread-head .text-btn,
+  .topbar .icon-btn {
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .chip {
+    height: 32px;
+  }
+
+  .drawer-head .icon-btn,
+  .drawer-head .secondary-btn,
+  .send-btn {
+    height: 40px;
+  }
+
+  .drawer-head .icon-btn {
+    min-width: 40px;
+  }
+
+  .recipient button,
+  .pill button {
+    min-height: 28px;
+  }
+}
+

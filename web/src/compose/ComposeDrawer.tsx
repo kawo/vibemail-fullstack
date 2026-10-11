@@ -23,6 +23,7 @@ import {
 } from '../lib/draftStore';
 import { asApiError, store } from '../state/store';
 import type { OpenRequest } from './ComposeContext';
+import { drawerGeometry } from './geometry';
 import { ComposeSheet } from './sheet/ComposeSheet';
 import type { ComposeNoticeView, ComposeView, SaveStatus } from './sheet/types';
 
@@ -34,7 +35,6 @@ type SendProblem = null | { kind: 'banner'; text: string; retry: boolean } | { k
 
 const AUTOSAVE_MS = 2000;
 const RETRY_SAVE_MS = 10_000;
-const MAX_HEIGHT_RATIO = 0.58;
 
 interface Initial {
   mode: Mode;
@@ -71,7 +71,10 @@ function fromDraft(draft: DraftSnapshot): ComposeFields {
   return { to: draft.to, subject: draft.subject, body: draft.body, ...(draft.requestedThreadId ? { threadId: draft.requestedThreadId } : {}) };
 }
 
-/** Keeps the drawer above the software keyboard and within 58% of the viewport height. */
+/**
+ * Keeps the drawer on top of the software keyboard and within 58% of the screen height
+ * (`drawerGeometry`), and keeps the focused field in view when the space changes.
+ */
 function useKeyboardAwareHeight(ref: React.RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const node = ref.current;
@@ -79,19 +82,27 @@ function useKeyboardAwareHeight(ref: React.RefObject<HTMLDivElement | null>) {
     if (!node) {
       return;
     }
-    // The viewport height before any keyboard opened: the drawer's cap is 58% of it.
+    // The no-keyboard height, per width: rotating the phone starts a new measurement.
+    let width = window.innerWidth;
     let fullHeight = window.innerHeight;
     const update = () => {
-      fullHeight = Math.max(fullHeight, window.innerHeight);
-      const cap = Math.round(fullHeight * MAX_HEIGHT_RATIO);
-      if (!viewport) {
-        node.style.setProperty('--drawer-height', `${cap}px`);
-        return;
+      if (window.innerWidth !== width) {
+        width = window.innerWidth;
+        fullHeight = window.innerHeight;
       }
-      const keyboard = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      const above = viewport.height - 8;
-      node.style.setProperty('--kb-offset', `${keyboard}px`);
-      node.style.setProperty('--drawer-height', `${Math.max(160, Math.min(cap, above))}px`);
+      fullHeight = Math.max(fullHeight, window.innerHeight);
+      const { height, keyboardOffset } = drawerGeometry({
+        fullHeight,
+        innerHeight: window.innerHeight,
+        visualHeight: viewport ? viewport.height : null,
+        visualOffsetTop: viewport ? viewport.offsetTop : 0,
+      });
+      node.style.setProperty('--kb-offset', `${keyboardOffset}px`);
+      node.style.setProperty('--drawer-height', `${height}px`);
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && node.contains(focused)) {
+        focused.scrollIntoView({ block: 'nearest' });
+      }
     };
     update();
     viewport?.addEventListener('resize', update);
