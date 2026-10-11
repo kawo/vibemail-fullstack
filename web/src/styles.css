@@ -86,12 +86,16 @@
   --radius-full: 9999px;
   --size-header: 48px;
   --size-row-min: 56px;
-  --size-chip: 28px;
   --size-control-sm: 28px;
   --size-control: 36px;
   --size-input: 40px;
   --size-drawer: 560px;
   --size-sidebar: 232px;
+  --size-sidebar-min: 184px;
+  --size-sidebar-max: 360px;
+  --size-avatar: 32px;
+  --size-avatar-sm: 24px;
+  --size-icon: 16px;
   --size-list-pane: clamp(340px, 30vw, 440px);
 
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
@@ -1381,14 +1385,14 @@ mark {
 }
 
 .avatar.md {
-  width: 32px;
-  height: 32px;
+  width: var(--size-avatar);
+  height: var(--size-avatar);
   font-size: 12px;
 }
 
 .avatar.sm {
-  width: 24px;
-  height: 24px;
+  width: var(--size-avatar-sm);
+  height: var(--size-avatar-sm);
   font-size: 10px;
 }
 
@@ -1479,7 +1483,7 @@ mark {
 }
 
 .card-main {
-  padding-left: calc(var(--space-md) + 32px + var(--space-sm));
+  padding-left: calc(var(--space-md) + var(--size-avatar) + var(--space-sm));
   padding-right: var(--space-lg);
 }
 
