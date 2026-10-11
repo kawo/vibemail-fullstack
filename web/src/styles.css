@@ -35,6 +35,10 @@
   --charcoal: #e8e5e5;
   --body: #d2d2d7;
   --mute: #bdbbbb;
+  /* Row hierarchy: sender full white, snippet white at 58% (the lowest that keeps 4.5:1 on
+     every row glass over the bright end of the backdrop). */
+  --row-sender: #ffffff;
+  --row-snippet: rgba(255, 255, 255, 0.58);
   --stone: #aeadb2;
   --ash: #9a9898;
   --on-dark: #fdfcfc;
@@ -589,13 +593,19 @@ button {
   background: transparent;
 }
 
+/* Row hierarchy, strongest first: sender (14px, full white, medium), subject (13px, softer
+   white), snippet (13px, white at 58%, the dimmest). Unread adds weight, never brightness to the
+   snippet, so the order holds in every row. */
 .row .from {
   grid-area: from;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 500;
+  color: var(--row-sender);
 }
 
 .row .meta {
@@ -626,26 +636,26 @@ button {
 }
 
 .row .subject {
-  color: var(--charcoal);
-  font-weight: 500;
+  color: var(--body);
+  font-weight: 400;
 }
 
 .row .dash {
-  color: var(--stone);
+  color: var(--row-snippet);
 }
 
 .row .snippet {
-  color: var(--mute);
+  color: var(--row-snippet);
 }
 
-.row.unread .from,
+/* DESIGN_SPEC §1: an unread row bolds its sender and subject. */
+.row.unread .from {
+  font-weight: 700;
+}
+
 .row.unread .subject {
   font-weight: 700;
-  color: var(--ink);
-}
-
-.row.unread .snippet {
-  color: var(--body);
+  color: var(--charcoal);
 }
 
 .attach-mark {
