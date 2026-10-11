@@ -109,7 +109,7 @@ export function SearchResults({ query }: { query: string }) {
       <Panel
         title="Search isn’t working right now"
         action={
-          <button type="button" className="primary-btn" onClick={() => (setState('loading'), void run(query, null))}>
+          <button type="button" className="secondary-btn" onClick={() => (setState('loading'), void run(query, null))}>
             Retry
           </button>
         }
@@ -120,7 +120,7 @@ export function SearchResults({ query }: { query: string }) {
     <div style={state === 'loading' ? { opacity: 0.55 } : undefined}>
       {hint && <p className="hint">{hint}</p>}
       {results.length === 0 && !hint ? (
-        <Panel title={`No messages match “${query}”`}>
+        <Panel empty title={`No messages match “${query}”`}>
           <p>Search covers the mail VibeMail has synced, including archived and trashed messages.</p>
         </Panel>
       ) : (
@@ -138,7 +138,7 @@ export function SearchResults({ query }: { query: string }) {
       {moreError && (
         <div className="inline-row">
           Couldn’t load more ·{' '}
-          <button type="button" className="text-btn" onClick={() => (setMoreError(false), setLoadingMore(true), void run(query, cursor))}>
+          <button type="button" className="link-btn" onClick={() => (setMoreError(false), setLoadingMore(true), void run(query, cursor))}>
             Retry
           </button>
         </div>

@@ -49,7 +49,7 @@ npm run build
 | §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` |
 | §4 Label filter | `src/lib/filters.ts` |
 | §5 Search | `src/components/SearchResults.tsx` |
-| Visual direction | `src/styles.css` |
+| Visual direction (VibeMail Glass design system tokens) | `src/styles.css` |
 
 Two contract invariants are enforced by the request types in `src/api/types.ts`:
 - **`status`:** no request type has a `status` field; it changes only through labels.

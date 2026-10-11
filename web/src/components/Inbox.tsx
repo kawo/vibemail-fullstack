@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MessageDTO } from '../api/types';
 import {
   type Chip,
@@ -14,7 +14,7 @@ import { relativeTime } from '../lib/format';
 import { loadInbox, loadMore, useStore } from '../state/store';
 import { MessageRow } from './MessageRow';
 import { SearchResults } from './SearchResults';
-import { Icon, Panel, Skeletons } from './ui';
+import { Glyph, Panel, Skeletons } from './ui';
 
 const MIN_QUERY = 2;
 const MAX_QUERY = 200;
@@ -42,23 +42,22 @@ function useNearEnd(onVisible: () => void, enabled: boolean) {
 function FilterBar({ chips, active, onSelect }: { chips: Chip[]; active: Chip; onSelect: (chip: Chip) => void }) {
   return (
     <nav className="filters" aria-label="Label filter">
-      {chips.map((chip) => (
-        <button
-          key={chipKey(chip)}
-          type="button"
-          className="chip"
-          aria-pressed={chipKey(chip) === chipKey(active)}
-          onClick={() => onSelect(chip)}
-        >
-          {chipLabel(chip)}
-        </button>
+      {chips.map((chip, i) => (
+        <Fragment key={chipKey(chip)}>
+          {/* A rule between the four fixed chips and the custom label chips. */}
+          {chip.kind === 'label' && chips[i - 1]?.kind !== 'label' && <span className="sep" aria-hidden="true" />}
+          <button type="button" className="chip" aria-pressed={chipKey(chip) === chipKey(active)} onClick={() => onSelect(chip)}>
+            {chip.kind === 'starred' && <Glyph name="star" />}
+            {chipLabel(chip)}
+          </button>
+        </Fragment>
       ))}
     </nav>
   );
 }
 
 /** Inbox (DESIGN_SPEC.md §1) with the label filter (§4) and the search entry point (§5). */
-export function Inbox({ hidden }: { hidden: boolean }) {
+export function Inbox({ covered }: { covered: boolean }) {
   const s = useStore();
   const { inbox } = s;
   const [chip, setChip] = useState<Chip>(FIXED_CHIPS[0] ?? { kind: 'all' });
@@ -121,17 +120,15 @@ export function Inbox({ hidden }: { hidden: boolean }) {
   const emptyChipText = emptyStateText(chip);
 
   return (
-    <div className={hidden ? 'hidden' : undefined}>
+    <div className={covered ? 'list-pane covered' : 'list-pane'}>
       <header className="topbar">
-        <div className="brand">
-          Vibe<span>Mail</span>
-        </div>
-        <label className="glass search">
-          <Icon name="search" size={18} />
+        <div className="brand">VibeMail</div>
+        <label className="search">
+          <Glyph name="search" />
           <span className="sr-only">Search mail</span>
           <input
             type="search"
-            placeholder="Search mail"
+            placeholder="Search synced mail"
             value={searchText}
             maxLength={MAX_QUERY}
             onChange={(e) => {
@@ -158,7 +155,7 @@ export function Inbox({ hidden }: { hidden: boolean }) {
             disabled={inbox.refreshing || inbox.state === 'loading'}
             onClick={() => void loadInbox({ refresh: true })}
           >
-            {inbox.refreshing ? <span className="spinner" /> : <Icon name="refresh" />}
+            {inbox.refreshing ? <span className="spinner" /> : <Glyph name="refresh" />}
           </button>
         )}
       </header>
@@ -167,10 +164,12 @@ export function Inbox({ hidden }: { hidden: boolean }) {
         <SearchResults query={query} />
       ) : (
         <>
-          <p className="synced" aria-live="polite">
-            {inbox.state === 'ready' &&
-              (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
-          </p>
+          <div className="status-line">
+            <p className="synced" aria-live="polite">
+              {inbox.state === 'ready' &&
+                (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
+            </p>
+          </div>
           <FilterBar chips={chips} active={chip} onSelect={selectChip} />
 
           <div
@@ -201,22 +200,22 @@ export function Inbox({ hidden }: { hidden: boolean }) {
               <Panel
                 title="Couldn’t load your mail"
                 action={
-                  <button type="button" className="primary-btn" onClick={() => void loadInbox()}>
+                  <button type="button" className="secondary-btn" onClick={() => void loadInbox()}>
                     Retry
                   </button>
                 }
               />
             ) : inbox.state === 'error' ? null : visible.length === 0 && !filling ? (
               emptyChipText ? (
-                <Panel title={emptyChipText}>
+                <Panel empty title={emptyChipText}>
                   {chip.kind !== 'starred' && <p>Only mail VibeMail has synced appears here.</p>}
                 </Panel>
               ) : inbox.lastSyncedAt === null && loaded.length === 0 ? (
-                <Panel title="Your mailbox is syncing">
+                <Panel empty title="Your mailbox is syncing">
                   <p>New mail will appear here as it arrives.</p>
                 </Panel>
               ) : (
-                <Panel title="You’re all caught up">
+                <Panel empty title="You’re all caught up">
                   {inbox.lastSyncedAt && <p>Synced {relativeTime(inbox.lastSyncedAt)}</p>}
                 </Panel>
               )
@@ -239,14 +238,14 @@ export function Inbox({ hidden }: { hidden: boolean }) {
                 {inbox.moreError && !inbox.loadingMore && (
                   <div className="inline-row">
                     Couldn’t load more ·{' '}
-                    <button type="button" className="text-btn" onClick={() => void loadMore()}>
+                    <button type="button" className="link-btn" onClick={() => void loadMore()}>
                       Retry
                     </button>
                   </div>
                 )}
                 {lookFurther && !inbox.loadingMore && (
                   <div className="inline-row">
-                    <button type="button" className="text-btn" onClick={() => setFillPages(0)}>
+                    <button type="button" className="link-btn" onClick={() => setFillPages(0)}>
                       Look further
                     </button>
                   </div>

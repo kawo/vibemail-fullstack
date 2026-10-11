@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import type { MessageDTO } from '../api/types';
 import { formatSize, displayName, highlight, relativeTime } from '../lib/format';
 import { markReadInBackground, markUnread, move, toggleStar } from '../state/actions';
-import { navigate } from '../router';
-import { Icon } from './ui';
+import { navigate, threadIdOf, usePath } from '../router';
+import { Glyph } from './ui';
 
 const SWIPE_ARCHIVE_PX = 90;
 
@@ -39,10 +39,13 @@ export function MessageRow({
     navigate(`/thread/${encodeURIComponent(message.threadId)}`);
   };
   const inTrash = message.status === 'trash';
+  // On desktop the open thread sits beside the list: mark its row.
+  const selected = threadIdOf(usePath()) === message.threadId;
 
   return (
     <article
-      className={`row${message.isRead ? '' : ' unread'}${pending ? ' pending' : ''}`}
+      className={`row${message.isRead ? '' : ' unread'}${selected ? ' selected' : ''}${pending ? ' pending' : ''}`}
+      aria-current={selected ? 'true' : undefined}
       style={dx ? { transform: `translateX(${dx}px)` } : undefined}
       onClick={() => !menuOpen && open()}
       onKeyDown={(e) => {
@@ -74,32 +77,33 @@ export function MessageRow({
         start.current = null;
       }}
     >
+      <button
+        type="button"
+        className={`icon-btn star ${message.isStarred ? 'on' : 'off'}`}
+        aria-label={message.isStarred ? 'Unstar' : 'Star'}
+        aria-pressed={message.isStarred}
+        onClick={(e) => {
+          e.stopPropagation();
+          void toggleStar(message);
+        }}
+      >
+        <Glyph name={message.isStarred ? 'star' : 'unstar'} />
+      </button>
       <div className="from">
         <Highlighted text={displayName(message.fromAddress)} terms={terms} />
       </div>
       <div className="meta">
-        {showStatus && message.status !== 'inbox' && <span className="badge">{message.status}</span>}
+        {showStatus && message.status !== 'inbox' && <span className={`badge ${message.status}`}>{message.status}</span>}
         {message.attachments.length > 0 && (
-          <span title={message.attachments.map((a) => `${a.filename} (${formatSize(a.size)})`).join(', ')}>
-            <Icon name="clip" size={16} />
+          <span className="attach-mark" title={message.attachments.map((a) => `${a.filename} (${formatSize(a.size)})`).join(', ')}>
+            <Glyph name="clip" />
+            <span className="sr-only">Has attachments</span>
           </span>
         )}
         <time dateTime={message.internalDate}>{relativeTime(message.internalDate)}</time>
         <button
           type="button"
-          className={`icon-btn star${message.isStarred ? ' on' : ''}`}
-          aria-label={message.isStarred ? 'Unstar' : 'Star'}
-          aria-pressed={message.isStarred}
-          onClick={(e) => {
-            e.stopPropagation();
-            void toggleStar(message);
-          }}
-        >
-          <Icon name="star" size={18} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
+          className="icon-btn more"
           aria-label="More actions"
           aria-expanded={menuOpen}
           onClick={(e) => {
@@ -107,14 +111,19 @@ export function MessageRow({
             setMenuOpen((v) => !v);
           }}
         >
-          <Icon name="more" size={18} />
+          <Glyph name="more" />
         </button>
       </div>
-      <div className="subject">
-        <Highlighted text={message.subject ?? '(no subject)'} terms={terms} />
-      </div>
-      <div className="snippet">
-        <Highlighted text={message.snippet} terms={terms} />
+      <div className="line">
+        <span className="subject">
+          <Highlighted text={message.subject ?? '(no subject)'} terms={terms} />
+        </span>
+        <span className="dash" aria-hidden="true">
+          {' — '}
+        </span>
+        <span className="snippet">
+          <Highlighted text={message.snippet} terms={terms} />
+        </span>
       </div>
       {menuOpen && (
         <div className="glass-raised menu" role="menu" onClick={(e) => e.stopPropagation()}>
@@ -133,9 +142,12 @@ export function MessageRow({
               Restore
             </button>
           ) : (
-            <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), void move(message, 'trash'))}>
-              Move to trash
-            </button>
+            <>
+              <div className="rule" role="separator" />
+              <button type="button" role="menuitem" className="danger" onClick={() => (setMenuOpen(false), void move(message, 'trash'))}>
+                Move to trash
+              </button>
+            </>
           )}
           <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
             Cancel

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
 import type { MessageDTO } from '../api/types';
-import { Icon } from '../components/ui';
+import { Glyph } from '../components/ui';
 import {
   type ComposeFields,
   type FieldIssue,
@@ -405,22 +405,22 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
         <div className="handle" aria-hidden="true" />
         <div className="drawer-head">
           <button type="button" className="icon-btn" aria-label="Close" onClick={close} disabled={sending}>
-            <Icon name="close" />
+            <Glyph name="close" />
           </button>
           <div className="drawer-title">
             {threadId ? 'Reply' : 'New message'}
-            <span className="save-state" aria-live="polite">
-              {saveLabel}
+            <span className={`save-state${saveState === 'unsaved' || saveState === 'stopped' ? ' warn' : ''}`} aria-live="polite">
+              {saveState === 'saved' && <Glyph name="done" className="ok" />} {saveLabel}
             </span>
           </div>
           <button type="button" className="icon-btn expand-btn" aria-label={expanded ? 'Collapse' : 'Expand'} onClick={() => setExpanded((v) => !v)}>
-            <Icon name="expand" size={18} />
+            <Glyph name={expanded ? 'collapse' : 'expand'} />
           </button>
           <button type="button" className="text-btn" onClick={() => setConfirm({ kind: 'discard' })} disabled={sending}>
             Discard
           </button>
-          <button type="button" className="primary-btn" disabled={!canSend} onClick={() => void send()}>
-            {sending ? <span className="spinner" /> : <Icon name="send" size={16} />}
+          <button type="button" className="primary-btn sm" disabled={!canSend} onClick={() => void send()}>
+            {sending && <span className="spinner" />}
             {blockedFor > 0 ? `Wait ${blockedFor}s` : 'Send'}
           </button>
         </div>
@@ -489,11 +489,11 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
         )}
 
         {threadId && (
-          <div className="notice">
+          <div className="notice plain">
             <span className="pill">
               Replying in conversation
               <button type="button" aria-label="Stop replying in this conversation" onClick={() => (setThreadId(undefined), edited())}>
-                ×
+                x
               </button>
             </span>
           </div>
@@ -506,7 +506,7 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
               <span key={`${address}-${i}`} className={`recipient${isValidAddress(address) ? '' : ' invalid'}`}>
                 {address}
                 <button type="button" aria-label={`Remove ${address}`} onClick={() => (setChips((prev) => prev.filter((_, j) => j !== i)), edited())}>
-                  ×
+                  x
                 </button>
               </span>
             ))}

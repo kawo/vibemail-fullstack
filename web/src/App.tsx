@@ -3,7 +3,7 @@ import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
 import { Inbox } from './components/Inbox';
 import { ThreadView } from './components/ThreadView';
-import { Icon, Toasts } from './components/ui';
+import { Glyph, Toasts } from './components/ui';
 import { ComposeProvider, useCompose } from './compose/ComposeContext';
 import { navigate, threadIdOf, usePath } from './router';
 import { store } from './state/store';
@@ -36,13 +36,10 @@ function SignIn({ error }: { error: string | null }) {
   return (
     <div className="signin">
       <div className="glass-raised panel">
-        <div className="orb" aria-hidden="true" />
-        <h1>
-          Vibe<span style={{ color: 'var(--accent)' }}>Mail</span>
-        </h1>
+        <h1>VibeMail</h1>
         <p>Your Gmail, liberated into a mailbox you own.</p>
         {error && (
-          <p role="alert" style={{ color: 'var(--danger)' }}>
+          <p role="alert" className="error">
             {error}
           </p>
         )}
@@ -58,13 +55,13 @@ function ReconnectPanel({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="reconnect-title">
       <div className="glass-raised panel">
-        <div className="orb" aria-hidden="true" />
+        <Glyph name="alert" className="mark" />
         <h2 id="reconnect-title">Reconnect Gmail</h2>
         <p>VibeMail lost access to your Gmail. Sign in with Google again to pick up where you left off.</p>
         <button type="button" className="primary-btn" onClick={startSignIn}>
           Reconnect Gmail
         </button>
-        <button type="button" className="text-btn" onClick={onDismiss}>
+        <button type="button" className="secondary-btn" onClick={onDismiss}>
           Not now
         </button>
       </div>
@@ -79,7 +76,7 @@ function ComposeButton() {
   }
   return (
     <button type="button" className="primary-btn fab" onClick={() => compose.open()}>
-      <Icon name="compose" size={18} /> Compose
+      <Glyph name="compose" /> Compose
     </button>
   );
 }
@@ -147,9 +144,16 @@ export function App() {
   return (
     <ComposeProvider>
       <main className="app">
-        {/* The inbox stays mounted behind the thread view, keeping its chip and scroll position. */}
-        <Inbox hidden={threadId !== null} />
-        {threadId !== null && <ThreadView key={threadId} threadId={threadId} />}
+        {/* The inbox stays mounted while a thread is open, keeping its chip and scroll position.
+            From 1024px the two sit side by side; below that the thread covers the list. */}
+        <Inbox covered={threadId !== null} />
+        <section className="reading-pane" aria-label="Conversation">
+          {threadId !== null ? (
+            <ThreadView key={threadId} threadId={threadId} />
+          ) : (
+            <p className="reading-empty">Select a conversation to read it here.</p>
+          )}
+        </section>
       </main>
       <ComposeButton />
       <Toasts />

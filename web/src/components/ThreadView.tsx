@@ -7,7 +7,7 @@ import { changeLabels, markReadInBackground, toggleStar } from '../state/actions
 import { asApiError, useStore } from '../state/store';
 import { navigate } from '../router';
 import { HtmlBody } from './HtmlBody';
-import { Icon, Panel } from './ui';
+import { Glyph, Panel } from './ui';
 
 function MessageCard({
   message,
@@ -19,51 +19,56 @@ function MessageCard({
   onToggle: () => void;
 }) {
   const compose = useCompose();
+  const badge = message.status === 'trash' || message.status === 'spam' || message.status === 'archived';
   return (
-    <article className={`glass card${message.status === 'sent' ? ' sent' : ''}`}>
+    <article className={`glass card${expanded ? ' expanded' : ''}${message.status === 'sent' ? ' sent' : ''}`}>
       <div className="card-head" onClick={onToggle} role="button" tabIndex={0} aria-expanded={expanded} onKeyDown={(e) => e.key === 'Enter' && onToggle()}>
         <span className="who">{displayName(message.fromAddress)}</span>
-        {(message.status === 'trash' || message.status === 'spam' || message.status === 'archived') && (
-          <span className="badge">{message.status}</span>
-        )}
-        <time className="synced" dateTime={message.internalDate}>
-          {relativeTime(message.internalDate)}
-        </time>
+        <span className="collapsed-snippet">{expanded ? null : message.snippet}</span>
+        <span className="when">
+          {badge && <span className={`badge ${message.status}`}>{message.status}</span>}
+          <time dateTime={message.internalDate}>{relativeTime(message.internalDate)}</time>
+          {expanded && (
+            <button
+              type="button"
+              className={`icon-btn star ${message.isStarred ? 'on' : 'off'}`}
+              aria-label={message.isStarred ? 'Unstar' : 'Star'}
+              aria-pressed={message.isStarred}
+              onClick={(e) => {
+                e.stopPropagation();
+                void toggleStar(message);
+              }}
+            >
+              <Glyph name={message.isStarred ? 'star' : 'unstar'} />
+            </button>
+          )}
+        </span>
       </div>
-      {!expanded ? (
-        <div className="collapsed-snippet">{message.snippet}</div>
-      ) : (
+      {expanded && (
         <>
           <div className="addr">
-            To {message.toAddress.join(', ') || '—'}
-            {message.ccAddresses.length > 0 && <> · Cc {message.ccAddresses.join(', ')}</>}
+            to {message.toAddress.join(', ') || '—'}
+            {message.ccAddresses.length > 0 && <> · cc {message.ccAddresses.join(', ')}</>}
           </div>
           {message.bodyHtml ? (
-            <HtmlBody html={message.bodyHtml} />
+            <div className="html-body">
+              <HtmlBody html={message.bodyHtml} />
+            </div>
           ) : (
             <div className="body-plain">{message.bodyPlain ?? message.snippet}</div>
           )}
           {message.attachments.length > 0 && (
             <div className="attachments" aria-label="Attachments">
               {message.attachments.map((a) => (
-                <span key={a.partId} className="attachment" title={a.mimeType}>
-                  <Icon name="clip" size={14} /> {a.filename} · {formatSize(a.size)}
+                <span key={a.partId} className="attachment">
+                  <b>{a.filename}</b> <span className="sep">·</span> {a.mimeType} <span className="sep">·</span> {formatSize(a.size)}
                 </span>
               ))}
             </div>
           )}
           <div className="card-actions">
-            <button type="button" className="text-btn" onClick={() => compose.open({ reply: message })}>
-              <Icon name="reply" size={16} /> Reply
-            </button>
-            <button
-              type="button"
-              className={`icon-btn star${message.isStarred ? ' on' : ''}`}
-              aria-label={message.isStarred ? 'Unstar' : 'Star'}
-              aria-pressed={message.isStarred}
-              onClick={() => void toggleStar(message)}
-            >
-              <Icon name="star" size={18} />
+            <button type="button" className="secondary-btn" onClick={() => compose.open({ reply: message })}>
+              Reply
             </button>
           </div>
         </>
@@ -147,7 +152,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
 
   const back = (
     <button type="button" className="icon-btn" aria-label="Back to inbox" onClick={() => navigate('/')}>
-      <Icon name="back" />
+      <Glyph name="back" />
     </button>
   );
 
@@ -169,11 +174,11 @@ export function ThreadView({ threadId }: { threadId: string }) {
           title={title}
           action={
             code === 'INTERNAL' || error?.canRetry ? (
-              <button type="button" className="primary-btn" onClick={() => setAttempt((n) => n + 1)}>
+              <button type="button" className="secondary-btn" onClick={() => setAttempt((n) => n + 1)}>
                 Retry
               </button>
             ) : (
-              <button type="button" className="primary-btn" onClick={() => navigate('/')}>
+              <button type="button" className="secondary-btn" onClick={() => navigate('/')}>
                 Back to inbox
               </button>
             )
@@ -187,36 +192,43 @@ export function ThreadView({ threadId }: { threadId: string }) {
     <>
       <div className="thread-head">
         {back}
-        <h1>{subject || <span className="skeleton" style={{ display: 'block', height: 22, width: '60%' }} />}</h1>
+        <h1>{subject || <span className="sr-only">Loading</span>}</h1>
         {state === 'ready' && (
           <>
-            <button type="button" className="icon-btn" aria-label="Archive conversation" disabled={busy} onClick={() => void moveAll('archive')}>
-              <Icon name="archive" />
+            <button type="button" className="text-btn" aria-label="Archive conversation" disabled={busy} onClick={() => void moveAll('archive')}>
+              Archive
             </button>
-            <button type="button" className="icon-btn" aria-label="Move conversation to trash" disabled={busy} onClick={() => void moveAll('trash')}>
-              <Icon name="trash" />
+            <button type="button" className="text-btn" aria-label="Move conversation to trash" disabled={busy} onClick={() => void moveAll('trash')}>
+              Trash
             </button>
           </>
         )}
       </div>
       {state === 'loading' ? (
-        <div className="list">
+        <div className="thread-body" aria-busy="true">
           {cached && (
             <div className="glass card">
-              <div className="collapsed-snippet">{cached.snippet}</div>
+              <div className="card-head">
+                <span className="who">{displayName(cached.fromAddress)}</span>
+                <span className="collapsed-snippet">{cached.snippet}</span>
+              </div>
             </div>
           )}
           {Array.from({ length: cached ? 2 : 3 }, (_, i) => (
-            <div key={i} className="skeleton" style={{ height: 96 }} />
+            <div key={i} className="skeleton bare" style={{ height: 96 }} />
           ))}
         </div>
       ) : (
-        <>
-          {truncated && <div className="glass banner">Earlier messages in this conversation aren’t available in VibeMail</div>}
+        <div className="thread-body">
+          {truncated && (
+            <div className="banner">
+              <Glyph name="missing" /> Earlier messages in this conversation aren’t available in VibeMail
+            </div>
+          )}
           {messages.map((message) => (
             <MessageCard key={message.gmailId} message={message} expanded={expanded.has(message.gmailId)} onToggle={() => toggle(message)} />
           ))}
-        </>
+        </div>
       )}
     </>
   );
