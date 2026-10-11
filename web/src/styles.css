@@ -347,6 +347,7 @@ button {
   gap: var(--space-lg);
   padding: var(--space-sm) var(--space-md) var(--space-xl);
   padding-top: max(env(safe-area-inset-top), var(--space-sm));
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -391,6 +392,7 @@ button {
 
 /* A label: the same active treatment the filter chips had (accent border, brightest fill). */
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -506,6 +508,83 @@ button {
 
   .nav-item {
     min-height: 40px;
+  }
+}
+
+/* The toggle in the sidebar header: beside the content only (phones show the panel's close). */
+.collapse-toggle {
+  font-size: 14px;
+}
+
+/* Icons only (768px and wider): a narrow strip of icon buttons. Names become tooltips and stay
+   in each button's accessible name; custom labels show a short id (#12). */
+@media (min-width: 768px) {
+  .sidebar.collapsed {
+    align-items: center;
+    padding-inline: var(--space-sm);
+    gap: var(--space-md);
+  }
+
+  .sidebar.collapsed .sidebar-head {
+    justify-content: center;
+    padding-left: 0;
+  }
+
+  .sidebar.collapsed .brand {
+    display: none;
+  }
+
+  .sidebar.collapsed .compose-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    gap: 0;
+  }
+
+  .sidebar.collapsed .label-nav,
+  .sidebar.collapsed .label-nav ul {
+    width: 40px;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: center;
+    gap: 0;
+    min-height: 40px;
+    padding: 0;
+  }
+
+  .sidebar.collapsed .nav-glyph {
+    width: auto;
+    font-size: 12px;
+  }
+
+  /* The "Labels" heading becomes a rule between the fixed and custom labels. */
+  .sidebar.collapsed .nav-heading {
+    height: 1px;
+    margin: var(--space-sm) var(--space-xs);
+    padding: 0;
+    background: var(--hairline);
+  }
+
+  .sidebar.collapsed .nav-empty {
+    display: none;
+  }
+
+  .sidebar.collapsed .compose-label,
+  .sidebar.collapsed .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .collapse-toggle {
+    display: none;
   }
 }
 

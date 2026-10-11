@@ -44,3 +44,26 @@ describe('resizable sidebar', () => {
     expect(() => saveSidebarWidth(300, blocked)).not.toThrow();
   });
 });
+
+describe('icons-only sidebar', () => {
+  it('remembers the mode and defaults to full labels', async () => {
+    const { loadSidebarCollapsed, saveSidebarCollapsed } = await import('../sidebarWidth');
+    const map = new Map<string, string>();
+    const storage = { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v) };
+    expect(loadSidebarCollapsed(storage)).toBe(false);
+    saveSidebarCollapsed(true, storage);
+    expect(loadSidebarCollapsed(storage)).toBe(true);
+    saveSidebarCollapsed(false, storage);
+    expect(loadSidebarCollapsed(storage)).toBe(false);
+    const blocked = { getItem: () => { throw new Error('blocked'); } };
+    expect(loadSidebarCollapsed(blocked)).toBe(false);
+  });
+
+  it('marks custom labels with a short id', async () => {
+    const { labelMark } = await import('../sidebarWidth');
+    expect(labelMark('Label_12')).toBe('#12');
+    expect(labelMark('Label_7')).toBe('#7');
+    expect(labelMark('Label_3456789')).toBe('#34');
+    expect(labelMark('CATEGORY')).toBe('#CA');
+  });
+});

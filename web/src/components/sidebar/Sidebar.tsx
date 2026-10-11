@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCompose } from '../../compose/ComposeContext';
 import { WIDE, useMediaQuery } from '../../lib/layout';
+import { loadSidebarCollapsed, saveSidebarCollapsed } from '../../lib/sidebarWidth';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { Glyph } from '../ui';
 import { LabelNav } from './LabelNav';
@@ -13,6 +14,9 @@ import { SidebarResizer } from './SidebarResizer';
  * On a phone it is a panel that slides in from the left (opened from the header's menu button),
  * over a scrim; choosing a label, Compose, the scrim or Escape closes it, and focus returns to
  * the menu button. Closed, it is `inert`, so it is out of the tab order.
+ *
+ * Beside the content, a toggle in its header collapses it to icons only (labels become tooltips
+ * and stay in the accessible name); the mode is remembered on the device.
  */
 export function Sidebar() {
   const compose = useCompose();
@@ -22,6 +26,14 @@ export function Sidebar() {
   const panel = useRef<HTMLElement | null>(null);
   const asPanel = !wide;
   const open = asPanel && menuOpen;
+  const [collapsedPref, setCollapsedPref] = useState(loadSidebarCollapsed);
+  const collapsed = wide && collapsedPref;
+  const toggleCollapsed = () => {
+    setCollapsedPref((v) => {
+      saveSidebarCollapsed(!v);
+      return !v;
+    });
+  };
 
   // Closing the phone panel when the screen widens keeps state from going stale.
   useEffect(() => {
@@ -53,7 +65,7 @@ export function Sidebar() {
       <aside
         id="sidebar"
         ref={panel}
-        className={`sidebar${open ? ' open' : ''}`}
+        className={`sidebar${open ? ' open' : ''}${collapsed ? ' collapsed' : ''}`}
         aria-label="Mailbox"
         role={asPanel ? 'dialog' : undefined}
         aria-modal={open ? true : undefined}
@@ -61,6 +73,19 @@ export function Sidebar() {
       >
         <div className="sidebar-head">
           <span className="brand">VibeMail</span>
+          {wide && (
+            <button
+              type="button"
+              className="icon-btn collapse-toggle"
+              aria-label={collapsed ? 'Show labels' : 'Show icons only'}
+              aria-expanded={!collapsed}
+              aria-controls="sidebar"
+              title={collapsed ? 'Show labels' : 'Show icons only'}
+              onClick={toggleCollapsed}
+            >
+              <Glyph name={collapsed ? 'expandSide' : 'collapseSide'} />
+            </button>
+          )}
           {asPanel && (
             <button type="button" className="icon-btn" aria-label="Close" onClick={() => setMenuOpen(false)}>
               <Glyph name="close" />
@@ -71,16 +96,17 @@ export function Sidebar() {
           type="button"
           className="primary-btn compose-btn"
           disabled={compose.isOpen}
+          title={collapsed ? 'Compose' : undefined}
           onClick={() => {
             setMenuOpen(false);
             compose.open();
           }}
         >
-          <Glyph name="compose" /> Compose
+          <Glyph name="compose" /> <span className="compose-label">Compose</span>
         </button>
-        <LabelNav chips={chips} active={chip} searching={searchActive} onSelect={selectChip} />
+        <LabelNav chips={chips} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
       </aside>
-      {wide && <SidebarResizer />}
+      {wide && <SidebarResizer collapsed={collapsed} />}
     </>
   );
 }

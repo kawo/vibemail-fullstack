@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampSidebar, loadSidebarWidth, saveSidebarWidth, widthForKey } from '../../lib/sidebarWidth';
+import {
+  SIDEBAR_COLLAPSED,
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MAX,
+  SIDEBAR_MIN,
+  clampSidebar,
+  loadSidebarWidth,
+  saveSidebarWidth,
+  widthForKey,
+} from '../../lib/sidebarWidth';
 
 function apply(width: number): void {
   document.documentElement.style.setProperty('--size-sidebar', `${width}px`);
@@ -10,14 +19,19 @@ function apply(width: number): void {
  * Drag it; or focus it and use ←/→ (Shift for bigger steps), Home/End for the limits, Enter or a
  * double-click to reset. The width is remembered on this device.
  */
-export function SidebarResizer() {
+export function SidebarResizer({ collapsed }: { collapsed: boolean }) {
   const [width, setWidth] = useState(loadSidebarWidth);
   const [dragging, setDragging] = useState(false);
   const frame = useRef(0);
 
+  // Icons only: a fixed narrow strip, and no handle. Expanding brings back the remembered width.
   useEffect(() => {
-    apply(width);
-  }, [width]);
+    apply(collapsed ? SIDEBAR_COLLAPSED : width);
+  }, [width, collapsed]);
+
+  if (collapsed) {
+    return null;
+  }
 
   const commit = (next: number) => {
     const w = clampSidebar(next);

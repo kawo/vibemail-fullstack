@@ -1,4 +1,5 @@
 import { type Chip, chipKey, chipLabel } from '../../lib/filters';
+import { labelMark } from '../../lib/sidebarWidth';
 import { Icon } from '../icons';
 import { Glyph } from '../ui';
 
@@ -12,11 +13,14 @@ export function LabelNav({
   chips,
   active,
   searching,
+  collapsed = false,
   onSelect,
 }: {
   chips: readonly Chip[];
   active: Chip;
   searching: boolean;
+  /** Icons only: the name moves to a tooltip; it stays in the button's accessible name. */
+  collapsed?: boolean;
   onSelect: (chip: Chip) => void;
 }) {
   const fixed = chips.filter((c) => c.kind !== 'label');
@@ -25,7 +29,13 @@ export function LabelNav({
     const current = !searching && chipKey(chip) === chipKey(active);
     return (
       <li key={chipKey(chip)}>
-        <button type="button" className="nav-item" aria-current={current ? 'page' : undefined} onClick={() => onSelect(chip)}>
+        <button
+          type="button"
+          className="nav-item"
+          aria-current={current ? 'page' : undefined}
+          title={collapsed ? chipLabel(chip) : undefined}
+          onClick={() => onSelect(chip)}
+        >
           <span className="nav-glyph" aria-hidden="true">
             {chip.kind === 'all' ? (
               <Icon name="inbox" />
@@ -35,6 +45,8 @@ export function LabelNav({
               <Icon name="archive" />
             ) : chip.kind === 'trash' ? (
               <Icon name="trash" />
+            ) : collapsed && chip.kind === 'label' ? (
+              labelMark(chip.labelId)
             ) : (
               '#'
             )}
@@ -47,7 +59,7 @@ export function LabelNav({
   return (
     <nav className="label-nav" aria-label="Labels">
       <ul>{fixed.map(item)}</ul>
-      <h2 className="nav-heading">Labels</h2>
+      <h2 className="nav-heading">{collapsed ? <span className="sr-only">Labels</span> : 'Labels'}</h2>
       {custom.length > 0 ? <ul>{custom.map(item)}</ul> : <p className="nav-empty">No labels on synced mail.</p>}
     </nav>
   );

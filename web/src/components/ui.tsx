@@ -19,6 +19,8 @@ const TEXT_GLYPHS = {
   alert: '[!]',
   missing: '[-]',
   chevron: '›',
+  collapseSide: '«',
+  expandSide: '»',
 } as const;
 
 const DRAWN_GLYPHS = {
