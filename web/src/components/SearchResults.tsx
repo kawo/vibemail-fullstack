@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ApiError, api, isAbort } from '../api/client';
 import { asApiError, useStore } from '../state/store';
-import { MessageRow } from './MessageRow';
+import { MessageRow } from './inbox/MessageRow';
 import { Panel, Skeletons } from './ui';
 
 const DEBOUNCE_MS = 300;

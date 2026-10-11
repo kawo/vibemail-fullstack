@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import type { MessageDTO } from '../api/types';
-import { formatSize, displayName, highlight, relativeTime } from '../lib/format';
-import { markReadInBackground, markUnread, move, toggleStar } from '../state/actions';
-import { navigate, threadIdOf, usePath } from '../router';
-import { Glyph } from './ui';
+import type { MessageDTO } from '../../api/types';
+import { formatSize, displayName, highlight, relativeTime } from '../../lib/format';
+import { markReadInBackground, markUnread, move, toggleStar } from '../../state/actions';
+import { navigate, threadIdOf, usePath } from '../../router';
+import { Glyph } from '../ui';
 
 const SWIPE_ARCHIVE_PX = 90;
 

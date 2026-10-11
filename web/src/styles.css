@@ -542,8 +542,13 @@ button {
 }
 
 .row.unread {
+  background: var(--surface-card);
   box-shadow: var(--unread-glow);
   color: var(--ink);
+}
+
+.row.unread:hover {
+  background: var(--surface-dark-elevated);
 }
 
 .row.unread.selected {
@@ -556,7 +561,32 @@ button {
   min-width: 28px;
   height: 20px;
   padding: 0;
-  font-size: 13px;
+  font-size: 15px;
+  transition: opacity 120ms ease;
+}
+
+/* An unstarred row hides its outlined star until the row is hovered or focused, then shows it
+   at low strength. Touch screens have no hover, so there it rests at low strength. The button
+   stays in the tab order and in the accessibility tree either way. */
+.row .star.off {
+  opacity: 0;
+}
+
+.row:hover .star.off,
+.row:focus-within .star.off,
+.row .star.off:focus-visible {
+  opacity: 0.45;
+}
+
+@media (hover: none) {
+  .row .star.off {
+    opacity: 0.45;
+  }
+}
+
+.row .star.off:hover {
+  opacity: 1;
+  background: transparent;
 }
 
 .row .from {

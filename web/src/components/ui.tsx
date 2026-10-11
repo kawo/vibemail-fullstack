@@ -7,8 +7,8 @@ import { store, useStore } from '../state/store';
  */
 const GLYPHS = {
   search: '/',
-  star: '[*]',
-  unstar: '[ ]',
+  star: '★',
+  unstar: '☆',
   more: '...',
   back: '<-',
   close: 'x',

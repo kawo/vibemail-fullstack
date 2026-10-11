@@ -44,7 +44,7 @@ npm run build
 | Spec | Code |
 |---|---|
 | Shared rules (auth refresh, reconnect, retry) | `src/api/client.ts`, `src/App.tsx` |
-| §1 Inbox and its label filter bar | `src/components/Inbox.tsx`, `MessageRow.tsx` |
+| §1 Inbox and its label filter bar | `src/components/inbox/` (`InboxView`, `SearchBar`, `LabelFilterBar`, `MessageList`, `MessageRow`, `ComposeButton`) |
 | §2 Thread view | `src/components/ThreadView.tsx`, `HtmlBody.tsx` |
 | §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` |
 | §4 Label filter | `src/lib/filters.ts` |

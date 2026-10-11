@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
-import { Inbox } from './components/Inbox';
+import { ComposeButton, InboxView } from './components/inbox';
 import { ThreadView } from './components/ThreadView';
 import { Glyph, Toasts } from './components/ui';
-import { ComposeProvider, useCompose } from './compose/ComposeContext';
+import { ComposeProvider } from './compose/ComposeContext';
 import { navigate, threadIdOf, usePath } from './router';
 import { store } from './state/store';
 
@@ -66,18 +66,6 @@ function ReconnectPanel({ onDismiss }: { onDismiss: () => void }) {
         </button>
       </div>
     </div>
-  );
-}
-
-function ComposeButton() {
-  const compose = useCompose();
-  if (compose.isOpen) {
-    return null;
-  }
-  return (
-    <button type="button" className="primary-btn fab" onClick={() => compose.open()}>
-      <Glyph name="compose" /> Compose
-    </button>
   );
 }
 
@@ -146,7 +134,7 @@ export function App() {
       <main className="app">
         {/* The inbox stays mounted while a thread is open, keeping its chip and scroll position.
             From 1024px the two sit side by side; below that the thread covers the list. */}
-        <Inbox covered={threadId !== null} />
+        <InboxView covered={threadId !== null} />
         <section className="reading-pane" aria-label="Conversation">
           {threadId !== null ? (
             <ThreadView key={threadId} threadId={threadId} />
