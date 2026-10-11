@@ -422,7 +422,9 @@ button {
   color: var(--stone);
 }
 
-.nav-glyph .glyph {
+.nav-glyph .icon.star-mark,
+.nav-item:hover .nav-glyph .icon.star-mark,
+.nav-item[aria-current='page'] .nav-glyph .icon.star-mark {
   color: var(--warning);
 }
 
@@ -940,11 +942,21 @@ button {
 }
 
 .attach-mark {
+  display: inline-flex;
   color: var(--stone);
 }
 
+/* Icons inside a line of 12px text: 14px, sitting on the text's centre line. */
+.attach-mark .icon,
+.attachment .icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: -3px;
+}
+
 /* The star, identical in inbox rows, search rows, the thread header and message cards:
-   ★ in warning when starred; ☆ in ink at low strength when not, full strength on hover. */
+   the filled star in warning when starred; the outline in ink at low strength when not, full strength on hover. */
 .star {
   min-width: var(--size-control-sm);
   font-size: 16px;
@@ -1273,6 +1285,11 @@ mark {
   flex: 1;
 }
 
+.read-toggle .icon {
+  width: 10px;
+  height: 10px;
+}
+
 .read-toggle .glyph {
   font-size: 10px;
   color: var(--mute);
@@ -1282,6 +1299,11 @@ mark {
   color: var(--ink);
 }
 
+.read-toggle .icon {
+  color: var(--mute);
+}
+
+.read-toggle.on .icon,
 .read-toggle.on .glyph {
   color: var(--accent);
 }

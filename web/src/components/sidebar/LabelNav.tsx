@@ -30,7 +30,7 @@ export function LabelNav({
             {chip.kind === 'all' ? (
               <Icon name="inbox" />
             ) : chip.kind === 'starred' ? (
-              <Glyph name="star" />
+              <Glyph name="star" className="star-mark" />
             ) : chip.kind === 'archive' ? (
               <Icon name="archive" />
             ) : chip.kind === 'trash' ? (

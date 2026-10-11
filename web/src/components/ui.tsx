@@ -1,19 +1,17 @@
 import type { ReactNode } from 'react';
 import { store, useStore } from '../state/store';
+import { type IconName, Icon } from './icons';
 
 /**
- * The design system's iconography: monospaced characters in the running text, never pictures.
+ * The design system's iconography. Monospaced characters for what the font can draw; the rest are
+ * drawn icons (components/icons.tsx) under the same names, so call sites don't care which.
  * A glyph-only button always carries an `aria-label`.
  */
-const GLYPHS = {
+const TEXT_GLYPHS = {
   search: '/',
-  star: '★',
-  unstar: '☆',
   more: '...',
   back: '<-',
   close: 'x',
-  refresh: '↻',
-  clip: '[≡]',
   compose: '+',
   expand: '[^]',
   collapse: '[v]',
@@ -21,17 +19,27 @@ const GLYPHS = {
   alert: '[!]',
   missing: '[-]',
   chevron: '›',
-  menu: '≡',
-  dot: '●',
-  ring: '○',
 } as const;
 
-export type GlyphName = keyof typeof GLYPHS;
+const DRAWN_GLYPHS = {
+  star: 'star',
+  unstar: 'star-outline',
+  refresh: 'refresh',
+  clip: 'paperclip',
+  menu: 'menu',
+  dot: 'dot',
+  ring: 'ring',
+} as const satisfies Record<string, IconName>;
+
+export type GlyphName = keyof typeof TEXT_GLYPHS | keyof typeof DRAWN_GLYPHS;
 
 export function Glyph({ name, className }: { name: GlyphName; className?: string }) {
+  if (name in DRAWN_GLYPHS) {
+    return <Icon name={DRAWN_GLYPHS[name as keyof typeof DRAWN_GLYPHS]} className={className} />;
+  }
   return (
     <span className={className ? `glyph ${className}` : 'glyph'} aria-hidden="true">
-      {GLYPHS[name]}
+      {TEXT_GLYPHS[name as keyof typeof TEXT_GLYPHS]}
     </span>
   );
 }
