@@ -4,6 +4,7 @@ import { WIDE, useMediaQuery } from '../../lib/layout';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { Glyph } from '../ui';
 import { LabelNav } from './LabelNav';
+import { SidebarResizer } from './SidebarResizer';
 
 /**
  * The left sidebar: product name, Compose, and the labels (DESIGN_SPEC.md §4).
@@ -79,6 +80,7 @@ export function Sidebar() {
         </button>
         <LabelNav chips={chips} active={chip} searching={searchActive} onSelect={selectChip} />
       </aside>
+      {wide && <SidebarResizer />}
     </>
   );
 }

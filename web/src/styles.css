@@ -503,6 +503,52 @@ button {
   }
 }
 
+/* The sidebar's edge doubles as a resize handle (768px and wider). */
+.sidebar-resizer {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .sidebar-resizer {
+    display: block;
+    position: fixed;
+    z-index: 15;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--size-sidebar) - 4px);
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .sidebar-resizer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    background: transparent;
+    transition: background 120ms ease;
+  }
+
+  .sidebar-resizer:hover::after,
+  .sidebar-resizer.dragging::after,
+  .sidebar-resizer:focus-visible::after {
+    background: var(--accent);
+  }
+
+  .sidebar-resizer:focus-visible {
+    outline: none;
+  }
+
+  body.resizing-sidebar,
+  body.resizing-sidebar * {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+}
+
 /* The active label's name heads the list (the filter bar it replaces used to show it). */
 .list-title {
   margin: 0;
@@ -980,6 +1026,33 @@ mark {
   color: var(--ink);
 }
 
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+
+/* Items without an icon line their words up with those that have one. */
+.menu button:not(:has(.icon)) {
+  padding-left: calc(var(--space-sm) + 16px + var(--space-sm));
+}
+
+.icon {
+  flex: none;
+  display: block;
+}
+
+.nav-glyph .icon {
+  margin: 0 auto;
+  color: var(--mute);
+}
+
+.nav-item:hover .nav-glyph .icon,
+.nav-item[aria-current='page'] .nav-glyph .icon {
+  color: var(--ink);
+}
+
 .menu button:hover {
   background: var(--surface-card);
 }
@@ -1220,7 +1293,7 @@ mark {
 .thread-head .menu {
   top: 34px;
   right: 0;
-  min-width: 240px;
+  min-width: 0;
 }
 
 .thread-body {

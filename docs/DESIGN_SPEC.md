@@ -99,7 +99,7 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 
 ### Label sidebar
 
-- **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
+- **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and the width is remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
 - **Fixed labels.** The sidebar always lists four fixed labels, in this order: **All**, **Starred**, **Archive**, **Trash**. They are present even when they match nothing.
 - **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one entry per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
   - The contract has no label-name endpoint, so a custom label shows the label ID.

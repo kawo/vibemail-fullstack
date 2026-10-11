@@ -3,6 +3,7 @@ import type { MessageDTO } from '../../api/types';
 import { formatSize, displayName, highlight, relativeTime } from '../../lib/format';
 import { markReadInBackground, markUnread, move, toggleStar } from '../../state/actions';
 import { navigate, threadIdOf, usePath } from '../../router';
+import { Icon } from '../icons';
 import { Glyph } from '../ui';
 
 const SWIPE_ARCHIVE_PX = 90;
@@ -134,7 +135,7 @@ export function MessageRow({
           )}
           {!inTrash && message.status !== 'archived' && (
             <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), void move(message, 'archive'))}>
-              Archive
+              <Icon name="archive" /> Archive
             </button>
           )}
           {inTrash ? (
@@ -145,7 +146,7 @@ export function MessageRow({
             <>
               <div className="rule" role="separator" />
               <button type="button" role="menuitem" className="danger" onClick={() => (setMenuOpen(false), void move(message, 'trash'))}>
-                Move to trash
+                <Icon name="trash" /> Move to trash
               </button>
             </>
           )}

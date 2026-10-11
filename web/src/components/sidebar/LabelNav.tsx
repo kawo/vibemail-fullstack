@@ -1,4 +1,5 @@
 import { type Chip, chipKey, chipLabel } from '../../lib/filters';
+import { Icon } from '../icons';
 import { Glyph } from '../ui';
 
 /**
@@ -26,7 +27,17 @@ export function LabelNav({
       <li key={chipKey(chip)}>
         <button type="button" className="nav-item" aria-current={current ? 'page' : undefined} onClick={() => onSelect(chip)}>
           <span className="nav-glyph" aria-hidden="true">
-            {chip.kind === 'starred' ? <Glyph name="star" /> : chip.kind === 'label' ? '#' : '·'}
+            {chip.kind === 'all' ? (
+              <Icon name="inbox" />
+            ) : chip.kind === 'starred' ? (
+              <Glyph name="star" />
+            ) : chip.kind === 'archive' ? (
+              <Icon name="archive" />
+            ) : chip.kind === 'trash' ? (
+              <Icon name="trash" />
+            ) : (
+              '#'
+            )}
           </span>
           <span className="nav-label">{chipLabel(chip)}</span>
         </button>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SPLIT, useMediaQuery } from '../../lib/layout';
+import { Icon } from '../icons';
 import { Glyph } from '../ui';
 
 /**
@@ -88,11 +89,11 @@ export function ThreadHeader({
             {menuOpen && (
               <div className="glass-raised menu" role="menu">
                 <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), controls.onArchive())}>
-                  Archive conversation
+                  <Icon name="archive" /> Archive conversation
                 </button>
                 <div className="rule" role="separator" />
                 <button type="button" role="menuitem" className="danger" onClick={() => (setMenuOpen(false), controls.onTrash())}>
-                  Move conversation to trash
+                  <Icon name="trash" /> Move conversation to trash
                 </button>
               </div>
             )}
