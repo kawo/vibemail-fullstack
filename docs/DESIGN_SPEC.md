@@ -303,7 +303,7 @@ The filter makes no request of its own. Pages it fetches through `GET /api/v1/me
 
 Shown when no message matches after the fill stopped with `nextCursor` `null`:
 - **Starred:** "No starred messages."
-- **Archive:** "Nothing archived yet."
+- **Archive:** "Nothing in Archive."
 - **Trash:** "Trash is empty."
 - **Custom label:** "No messages with this label."
 - **All:** the inbox empty state (§1).

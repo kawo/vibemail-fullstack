@@ -51,6 +51,7 @@
   --accent-text: #8ac2ff;
   --accent-hover: #0056b3;
   --accent-active: #004085;
+  --chip-active-tint: rgba(0, 122, 255, 0.22);
   --warning: #ff9f0a;
   --highlight: rgba(255, 159, 10, 0.28);
   --danger: #ff3b30;
@@ -547,11 +548,12 @@ button {
   color: var(--ink);
 }
 
+/* The active chip: accent border, and the brightest chip fill (white glass with an accent tint). */
 .chip[aria-pressed='true'] {
-  background: var(--surface-selected);
-  border-color: var(--selected-edge);
-  box-shadow: var(--glass-highlight);
-  color: var(--ink);
+  background: linear-gradient(var(--chip-active-tint), var(--chip-active-tint)), var(--surface-selected);
+  border-color: var(--accent);
+  box-shadow: var(--glass-highlight), 0 0 12px -4px var(--accent);
+  color: var(--row-sender);
 }
 
 .chip .glyph {
@@ -948,8 +950,15 @@ mark {
   margin-top: var(--space-sm);
 }
 
+/* Empty states sit centred in the list area. */
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: max(240px, calc(100dvh - 220px));
   padding: var(--space-xl) var(--space-md);
+  text-align: center;
 }
 
 .empty h2 {

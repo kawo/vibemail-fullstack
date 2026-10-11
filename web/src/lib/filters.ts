@@ -72,7 +72,7 @@ export function emptyStateText(chip: Chip): string | null {
     case 'starred':
       return 'No starred messages.';
     case 'archive':
-      return 'Nothing archived yet.';
+      return 'Nothing in Archive.';
     case 'trash':
       return 'Trash is empty.';
     case 'label':
