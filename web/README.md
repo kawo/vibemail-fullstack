@@ -50,7 +50,7 @@ With `npm run dev` running, `/gallery.html` shows the compose drawer's states an
 | §2 Thread view | `src/components/thread/` (`ThreadView`, `ThreadHeader`, `MessageCard`, `Avatar`, `ThreadSkeleton`), `HtmlBody.tsx`, `src/lib/thread.ts` |
 | §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` (state, autosave, send), `src/compose/sheet/` (`ComposeSheet`, `ComposeHeader`, `RecipientField`, `BodyField`) |
 | §4 Label filter | `src/lib/filters.ts` |
-| §5 Search | `src/components/SearchResults.tsx` |
+| §5 Search | `src/components/search/` (`SearchView`, `SearchResultList`); the field is `inbox/SearchBar` |
 | Visual direction (VibeMail Glass design system tokens) | `src/styles.css` |
 
 Two contract invariants are enforced by the request types in `src/api/types.ts`:

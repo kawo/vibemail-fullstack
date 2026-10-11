@@ -5,7 +5,8 @@ export const MAX_QUERY = 200;
 
 /**
  * The inbox header: product name, the search field and refresh (DESIGN_SPEC.md §1, §5).
- * Search is active once the trimmed text reaches 2 characters; Cancel or Escape ends it.
+ * Search is active once the trimmed text reaches 2 characters, and the field glows in the accent.
+ * The inline clear button (or Escape) empties the field and ends the search.
  */
 export function SearchBar({
   value,
@@ -27,7 +28,7 @@ export function SearchBar({
   return (
     <header className="topbar">
       <div className="brand">VibeMail</div>
-      <label className="search">
+      <label className={`search${searching ? ' active' : ''}`}>
         <Glyph name="search" />
         <span className="sr-only">Search mail</span>
         <input
@@ -35,12 +36,14 @@ export function SearchBar({
           placeholder="Search synced mail"
           value={value}
           maxLength={MAX_QUERY}
+          aria-describedby={searching ? undefined : 'search-hint'}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && onCancel()}
         />
-        {searching && (
-          <button type="button" className="text-btn" onClick={onCancel}>
-            Cancel
+        {value !== '' && (
+          // Clearing ends the search and restores the inbox, chip and scroll (§5).
+          <button type="button" className="icon-btn clear-btn" aria-label="Clear search" onClick={onCancel}>
+            <Glyph name="close" />
           </button>
         )}
       </label>
@@ -49,6 +52,9 @@ export function SearchBar({
           {refreshing ? <span className="spinner" /> : <Glyph name="refresh" />}
         </button>
       )}
+      <span id="search-hint" className="sr-only">
+        Type at least {MIN_QUERY} characters to search.
+      </span>
     </header>
   );
 }

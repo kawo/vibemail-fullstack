@@ -3,7 +3,7 @@ import type { MessageDTO } from '../../api/types';
 import { type Chip, FIXED_CHIPS, chipKey, customLabelIds, matchesChip, shouldFill } from '../../lib/filters';
 import { relativeTime } from '../../lib/format';
 import { loadInbox, loadMore, useStore } from '../../state/store';
-import { SearchResults } from '../SearchResults';
+import { SearchView } from '../search';
 import { LabelFilterBar } from './LabelFilterBar';
 import { MessageList } from './MessageList';
 import { MIN_QUERY, SearchBar } from './SearchBar';
@@ -96,7 +96,7 @@ export function InboxView({ covered }: { covered: boolean }) {
       />
 
       {searchActive && query.length >= MIN_QUERY ? (
-        <SearchResults query={query} />
+        <SearchView query={query} />
       ) : (
         <>
           <div className="status-line">

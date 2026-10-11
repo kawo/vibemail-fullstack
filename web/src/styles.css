@@ -52,6 +52,8 @@
   --accent-hover: #0056b3;
   --accent-active: #004085;
   --chip-active-tint: rgba(0, 122, 255, 0.22);
+  --search-glow: rgba(0, 122, 255, 0.18);
+  --search-glow-outer: rgba(0, 122, 255, 0.45);
   --warning: #ff9f0a;
   --highlight: rgba(255, 159, 10, 0.28);
   --danger: #ff3b30;
@@ -346,6 +348,19 @@ button {
   border-color: var(--ink);
 }
 
+/* Active search: accent edge with a soft accent glow around the glass. */
+.search.active {
+  background: var(--surface-card);
+  border-color: var(--accent);
+  box-shadow: var(--glass-highlight), 0 0 0 3px var(--search-glow), 0 0 18px -2px var(--search-glow-outer);
+}
+
+.search .clear-btn {
+  min-width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
 .search .glyph {
   color: var(--stone);
 }
@@ -364,7 +379,7 @@ button {
   color: var(--mute);
 }
 
-/* Hide the native search clear button; Cancel and Escape do that job. */
+/* Hide the native search clear button; the inline clear button and Escape do that job. */
 .search input::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
@@ -902,6 +917,19 @@ mark {
   overflow: hidden;
   color: var(--mute);
   transition: height 150ms ease;
+}
+
+.result-count {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Refining a query: earlier results stay, dimmed, until the new ones arrive (§5). */
+.search-results.refining {
+  opacity: 0.55;
 }
 
 .hint {

@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ApiError, api, isAbort } from '../api/client';
-import { asApiError, useStore } from '../state/store';
-import { MessageRow } from './inbox/MessageRow';
-import { Panel, Skeletons } from './ui';
+import { type ApiError, api, isAbort } from '../../api/client';
+import type { MessageDTO } from '../../api/types';
+import { asApiError, useStore } from '../../state/store';
+import { Panel, Skeletons } from '../ui';
+import { SearchResultList } from './SearchResultList';
 
 const DEBOUNCE_MS = 300;
 
 /**
- * Search (DESIGN_SPEC.md §5): `GET /api/v1/messages/search`. Only the latest query's response is
- * rendered; typing aborts the request in flight. Results keep their place after a row action,
- * with the badge updated from the returned `status`.
+ * Search (DESIGN_SPEC.md §5): `GET /api/v1/messages/search`, 300 ms after the last keystroke.
+ * Only the latest query's response is rendered; typing aborts the request in flight. Results keep
+ * their place after a row action, with the badge updated from the returned `status`.
+ *
+ *   SearchView          query, paging, loading and error states
+ *   └─ SearchResultList results (inbox rows) or "No messages match your search."
  */
-export function SearchResults({ query }: { query: string }) {
+export function SearchView({ query }: { query: string }) {
   const s = useStore();
   const [ids, setIds] = useState<string[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -99,7 +103,7 @@ export function SearchResults({ query }: { query: string }) {
     return () => observer.disconnect();
   }, [cursor, state, loadingMore, moreError, query, run]);
 
-  const results = ids.map((id) => s.get(id)).filter((m) => m !== undefined);
+  const results = ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined);
 
   if (state === 'loading' && results.length === 0) {
     return <Skeletons count={3} />;
@@ -117,31 +121,17 @@ export function SearchResults({ query }: { query: string }) {
     );
   }
   return (
-    <div style={state === 'loading' ? { opacity: 0.55 } : undefined}>
+    <div className={state === 'loading' ? 'search-results refining' : 'search-results'}>
       {hint && <p className="hint">{hint}</p>}
-      {results.length === 0 && !hint ? (
-        <Panel empty title={`No messages match “${query}”`}>
-          <p>Search covers the mail VibeMail has synced, including archived and trashed messages.</p>
-        </Panel>
-      ) : (
-        <div className="list">
-          {results.map((message) => (
-            <MessageRow key={message.gmailId} message={message} pending={s.pending.has(message.gmailId)} terms={terms} showStatus />
-          ))}
-        </div>
-      )}
-      {loadingMore && (
-        <div className="inline-row">
-          <span className="spinner" />
-        </div>
-      )}
-      {moreError && (
-        <div className="inline-row">
-          Couldn’t load more ·{' '}
-          <button type="button" className="link-btn" onClick={() => (setMoreError(false), setLoadingMore(true), void run(query, cursor))}>
-            Retry
-          </button>
-        </div>
+      {!hint && (
+        <SearchResultList
+          results={results}
+          terms={terms}
+          pending={s.pending}
+          loadingMore={loadingMore}
+          moreError={moreError}
+          onRetryMore={() => (setMoreError(false), setLoadingMore(true), void run(query, cursor))}
+        />
       )}
       <div ref={sentinel} />
     </div>

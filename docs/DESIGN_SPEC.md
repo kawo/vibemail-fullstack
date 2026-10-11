@@ -320,7 +320,7 @@ Primary endpoint: `GET /api/v1/messages/search` (§4.9, *v1.1*).
 
 - **When search is active.** The search field is focused and its trimmed text has at least 2 characters. The first request is sent 300 ms after the last keystroke.
 - **Inactive.** Below 2 characters, search is inactive and the inbox list with its filter bar is shown unchanged.
-- **Leaving search.** Clearing the field, pressing Escape or tapping Cancel ends search and restores the inbox with its previous chip and scroll position.
+- **Leaving search.** Clearing the field (the inline clear button) or pressing Escape ends search and restores the inbox with its previous chip and scroll position.
 - **Query length.** The field accepts at most 200 characters.
 
 ### Default state
@@ -354,7 +354,7 @@ Row actions surface the inbox's `PATCH /api/v1/messages/{id}` and `POST /api/v1/
 
 ### Empty state
 
-When `messages` is empty on the first page, the app shows "No messages match "{query}"", with the line "Search covers the mail VibeMail has synced, including archived and trashed messages."
+When `messages` is empty on the first page, the app shows "No messages match your search.", centred, with the line "Search covers the mail VibeMail has synced, including archived and trashed messages."
 
 ---
 
