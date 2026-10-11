@@ -1,6 +1,6 @@
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { MessageDTO } from '../api/types';
-import { type Chip, FIXED_CHIPS, chipKey, customLabelIds } from '../lib/filters';
+import { type Chip, FIXED_CHIPS, chipCounts, chipKey, customLabelIds } from '../lib/filters';
 import { MIN_QUERY } from '../components/inbox/SearchBar';
 import { navigate, threadIdOf } from '../router';
 import { useStore } from './store';
@@ -80,12 +80,13 @@ export function useInboxUi(): InboxUi {
   return value;
 }
 
-/** The loaded inbox messages (from the shared cache) and the labels they produce. */
-export function useLoadedMessages(): { loaded: MessageDTO[]; chips: Chip[] } {
+/** The loaded inbox messages (from the shared cache), the labels they produce, and per-label counts. */
+export function useLoadedMessages(): { loaded: MessageDTO[]; chips: Chip[]; counts: Map<string, number> } {
   const s = useStore();
   const version = s.getVersion();
   const ids = s.inbox.ids;
   const loaded = useMemo(() => ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined), [ids, version, s]);
   const chips = useMemo(() => [...FIXED_CHIPS, ...customLabelIds(loaded).map((labelId): Chip => ({ kind: 'label', labelId }))], [loaded]);
-  return { loaded, chips };
+  const counts = useMemo(() => chipCounts(loaded, chips), [loaded, chips]);
+  return { loaded, chips, counts };
 }

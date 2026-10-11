@@ -441,6 +441,23 @@ button {
   white-space: nowrap;
 }
 
+/* Matches per label (meta-sm in mute), right-aligned; brighter on the active label. */
+.nav-count {
+  margin-left: auto;
+  flex: none;
+  padding-left: var(--space-sm);
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-item:hover .nav-count,
+.nav-item[aria-current='page'] .nav-count {
+  color: var(--body);
+}
+
 @media (min-width: 768px) {
   .shell {
     display: grid;
@@ -569,6 +586,24 @@ button {
 
   .sidebar.collapsed .nav-empty {
     display: none;
+  }
+
+  /* Collapsed, the count is a small level-2 glass badge on the icon's top-right corner. */
+  .sidebar.collapsed .nav-count {
+    position: absolute;
+    top: -1px;
+    right: -6px;
+    min-width: 16px;
+    height: 14px;
+    margin: 0;
+    padding: 0 3px;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(var(--surface-card), var(--surface-card)), var(--glass-tint);
+    color: var(--ink);
+    font-size: 10px;
+    line-height: 12px;
+    text-align: center;
   }
 
   .sidebar.collapsed .compose-label,

@@ -21,7 +21,7 @@ import { SidebarResizer } from './SidebarResizer';
 export function Sidebar() {
   const compose = useCompose();
   const { chip, selectChip, searchActive, menuOpen, setMenuOpen } = useInboxUi();
-  const { chips } = useLoadedMessages();
+  const { chips, counts } = useLoadedMessages();
   const wide = useMediaQuery(WIDE);
   const panel = useRef<HTMLElement | null>(null);
   const asPanel = !wide;
@@ -104,7 +104,7 @@ export function Sidebar() {
         >
           <Glyph name="compose" /> <span className="compose-label">Compose</span>
         </button>
-        <LabelNav chips={chips} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
+        <LabelNav chips={chips} counts={counts} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
       </aside>
       {wide && <SidebarResizer collapsed={collapsed} />}
     </>

@@ -1,4 +1,4 @@
-import { type Chip, chipKey, chipLabel } from '../../lib/filters';
+import { type Chip, chipKey, chipLabel, showsCount } from '../../lib/filters';
 import { labelMark } from '../../lib/sidebarWidth';
 import { Icon } from '../icons';
 import { Glyph } from '../ui';
@@ -8,15 +8,21 @@ import { Glyph } from '../ui';
  * and in order, then one entry per custom `Label_…` ID among the loaded messages, alphabetically.
  * The active label is marked with `aria-current`; while a search runs, none is (results span every
  * status), and picking one ends the search.
+ *
+ * Every label but All shows how many loaded messages it matches (none when zero). Collapsed, the
+ * count becomes a small badge on the icon and joins the tooltip.
  */
 export function LabelNav({
   chips,
+  counts,
   active,
   searching,
   collapsed = false,
   onSelect,
 }: {
   chips: readonly Chip[];
+  /** Matches per label, keyed by `chipKey`. */
+  counts?: ReadonlyMap<string, number>;
   active: Chip;
   searching: boolean;
   /** Icons only: the name moves to a tooltip; it stays in the button's accessible name. */
@@ -27,13 +33,16 @@ export function LabelNav({
   const custom = chips.filter((c) => c.kind === 'label');
   const item = (chip: Chip) => {
     const current = !searching && chipKey(chip) === chipKey(active);
+    const count = counts?.get(chipKey(chip)) ?? 0;
+    const counted = showsCount(chip, count);
+    const shown = count > 999 ? '999+' : String(count);
     return (
       <li key={chipKey(chip)}>
         <button
           type="button"
           className="nav-item"
           aria-current={current ? 'page' : undefined}
-          title={collapsed ? chipLabel(chip) : undefined}
+          title={collapsed ? (counted ? `${chipLabel(chip)} · ${shown}` : chipLabel(chip)) : undefined}
           onClick={() => onSelect(chip)}
         >
           <span className="nav-glyph" aria-hidden="true">
@@ -52,6 +61,13 @@ export function LabelNav({
             )}
           </span>
           <span className="nav-label">{chipLabel(chip)}</span>
+          {counted && (
+            <span className="nav-count">
+              <span className="sr-only">, </span>
+              {shown}
+              <span className="sr-only">{count === 1 ? ' message' : ' messages'}</span>
+            </span>
+          )}
         </button>
       </li>
     );

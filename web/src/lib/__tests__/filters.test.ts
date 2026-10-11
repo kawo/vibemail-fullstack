@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Chip, FIXED_CHIPS, chipLabel, customLabelIds, matchesChip, shouldFill } from '../filters';
+import { type Chip, FIXED_CHIPS, chipCounts, chipLabel, customLabelIds, matchesChip, shouldFill, showsCount } from '../filters';
 import { message } from './fixtures';
 
 describe('label filter (DESIGN_SPEC.md §4)', () => {
@@ -22,6 +22,25 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
   it('Trash is status trash', () => expect(ids({ kind: 'trash' })).toEqual(['d']));
   it('a custom label matches labelIds, outside trash and spam', () => {
     expect(ids({ kind: 'label', labelId: 'Label_1' })).toEqual(['c']);
+  });
+
+  it('counts each label with the same rule as the filter', () => {
+    const chips: Chip[] = [...FIXED_CHIPS, { kind: 'label', labelId: 'Label_1' }, { kind: 'label', labelId: 'Label_2' }];
+    expect(Object.fromEntries(chipCounts(all, chips))).toEqual({
+      all: 4,
+      starred: 1,
+      archive: 1,
+      trash: 1,
+      'label:Label_1': 1,
+      'label:Label_2': 1,
+    });
+  });
+
+  it('shows a count on every label but All, and never a zero', () => {
+    expect(showsCount({ kind: 'all' }, 4)).toBe(false);
+    expect(showsCount({ kind: 'trash' }, 0)).toBe(false);
+    expect(showsCount({ kind: 'starred' }, 2)).toBe(true);
+    expect(showsCount({ kind: 'label', labelId: 'Label_1' }, 1)).toBe(true);
   });
 
   it('lists custom labels (Label_*) from loaded messages, sorted, and shows the ID', () => {

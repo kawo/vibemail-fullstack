@@ -45,6 +45,30 @@ export function customLabelIds(messages: readonly MessageDTO[]): string[] {
   return [...ids].sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * How many loaded messages each label matches, keyed by `chipKey`. Counts cover only mail
+ * VibeMail has synced and loaded (the contract has no count endpoint), the same set the label
+ * filter works on.
+ */
+export function chipCounts(messages: readonly MessageDTO[], chips: readonly Chip[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const chip of chips) {
+    let n = 0;
+    for (const message of messages) {
+      if (matchesChip(message, chip)) {
+        n += 1;
+      }
+    }
+    counts.set(chipKey(chip), n);
+  }
+  return counts;
+}
+
+/** The sidebar shows a count on every label except All; a zero shows nothing. */
+export function showsCount(chip: Chip, count: number): boolean {
+  return chip.kind !== 'all' && count > 0;
+}
+
 export function chipKey(chip: Chip): string {
   return chip.kind === 'label' ? `label:${chip.labelId}` : chip.kind;
 }
