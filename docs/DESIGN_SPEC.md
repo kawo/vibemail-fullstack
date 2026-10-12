@@ -150,7 +150,7 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
 ### Default state
 
 - **Placement.** From 1100px wide, the thread opens in a reading pane beside the message list, and the opened row stays highlighted; the header's close control empties the pane. Narrower, the thread replaces the list, sliding in from the right, with a back control.
-- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox.
+- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox. On the right, four icon buttons, each with its name as label and tooltip: the read toggle (`ring` when read, the accent `dot` when unread: "Mark as unread" / "Mark as read"), the conversation star, **Archive conversation** (`archive`) and **Move conversation to trash** (`trash`, `danger-text` on hover). While one runs, a spinner leads them and they are disabled.
 - **Message cards.** One glass card per message, oldest first. The newest message is expanded and the earlier ones are collapsed.
   - **Collapsed card:** `fromAddress`, `snippet` and `internalDate`.
   - **Expanded card header:** `fromAddress`, `toAddress`, `ccAddresses` (when non-empty) and `internalDate`.

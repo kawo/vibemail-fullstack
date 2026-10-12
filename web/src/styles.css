@@ -1595,37 +1595,21 @@ mark {
   flex: 1;
 }
 
-.read-toggle .icon {
-  width: 10px;
-  height: 10px;
-}
-
-.read-toggle .glyph {
-  font-size: 10px;
-  color: var(--mute);
-}
-
-.read-toggle.on {
-  color: var(--ink);
-}
-
+/* The read toggle: a ring when read, the accent dot when unread (the accent is a mark here). */
 .read-toggle .icon {
   color: var(--mute);
 }
 
-.read-toggle.on .icon,
-.read-toggle.on .glyph {
+.read-toggle.on .icon {
   color: var(--accent);
 }
 
-.menu-anchor {
-  position: relative;
+.thread-head .icon-btn.danger:hover:not(:disabled) {
+  color: var(--danger-text);
 }
 
-.thread-head .menu {
-  top: 34px;
-  right: 0;
-  min-width: 0;
+.thread-head .spinner {
+  margin-right: var(--space-xs);
 }
 
 .thread-body {

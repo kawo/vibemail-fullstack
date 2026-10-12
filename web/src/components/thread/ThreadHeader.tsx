@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
 import { SPLIT, useMediaQuery } from '../../lib/layout';
 import { Icon } from '../icons';
 import { Glyph } from '../ui';
 
 /**
- * The thread view's sticky header: back on the left; on the right the read/unread toggle, the
- * conversation star and a menu with Archive and Move to trash (DESIGN_SPEC.md §2). The controls
- * on the right appear once the thread has loaded; back works at once.
+ * The thread view's sticky header (DESIGN_SPEC.md §2): back (or close, beside the list) on the
+ * left; on the right four icon buttons: the read/unread toggle, the conversation star, Archive and
+ * Move to trash. Each keeps its name as its accessible label and tooltip. The controls on the
+ * right appear once the thread has loaded; back works at once. While an action runs, a spinner
+ * leads them and they are disabled.
  */
 export function ThreadHeader({
   controls,
@@ -23,27 +24,10 @@ export function ThreadHeader({
   };
   onBack: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   // Beside the list the thread is closed, not left: an x instead of a back arrow.
   const split = useMediaQuery(SPLIT);
-  const menu = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !menu.current?.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [menuOpen]);
+  const readLabel = controls?.unread ? 'Mark as read' : 'Mark as unread';
+  const starLabel = controls?.starred ? 'Unstar conversation' : 'Star conversation';
 
   return (
     <div className="thread-head">
@@ -53,51 +37,49 @@ export function ThreadHeader({
       <span className="spacer" />
       {controls && (
         <>
+          {controls.busy && <span className="spinner" aria-label="Working" />}
           <button
             type="button"
-            className={`text-btn read-toggle${controls.unread ? ' on' : ''}`}
+            className={`icon-btn read-toggle${controls.unread ? ' on' : ''}`}
             aria-pressed={controls.unread}
-            title={controls.unread ? 'Mark as read' : 'Mark as unread'}
+            aria-label={readLabel}
+            title={readLabel}
             disabled={controls.busy}
             onClick={controls.onToggleUnread}
           >
             <Glyph name={controls.unread ? 'dot' : 'ring'} />
-            Unread
           </button>
           <button
             type="button"
             className={`icon-btn star ${controls.starred ? 'on' : 'off'}`}
-            aria-label={controls.starred ? 'Unstar conversation' : 'Star conversation'}
+            aria-label={starLabel}
+            title={starLabel}
             aria-pressed={controls.starred}
             disabled={controls.busy}
             onClick={controls.onToggleStar}
           >
             <Glyph name={controls.starred ? 'star' : 'unstar'} />
           </button>
-          <div className="menu-anchor" ref={menu}>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="More actions"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              disabled={controls.busy}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              {controls.busy ? <span className="spinner" /> : <Glyph name="more" />}
-            </button>
-            {menuOpen && (
-              <div className="glass-raised menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), controls.onArchive())}>
-                  <Icon name="archive" /> Archive conversation
-                </button>
-                <div className="rule" role="separator" />
-                <button type="button" role="menuitem" className="danger" onClick={() => (setMenuOpen(false), controls.onTrash())}>
-                  <Icon name="trash" /> Move conversation to trash
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Archive conversation"
+            title="Archive conversation"
+            disabled={controls.busy}
+            onClick={controls.onArchive}
+          >
+            <Icon name="archive" />
+          </button>
+          <button
+            type="button"
+            className="icon-btn danger"
+            aria-label="Move conversation to trash"
+            title="Move conversation to trash"
+            disabled={controls.busy}
+            onClick={controls.onTrash}
+          >
+            <Icon name="trash" />
+          </button>
         </>
       )}
     </div>
