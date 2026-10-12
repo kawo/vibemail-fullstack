@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initials, isThreadStarred, isThreadUnread, starTargets, threadSubject, unreadTargets } from '../thread';
+import { initials, isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '../thread';
 import { message } from './fixtures';
 
 describe('thread view helpers (DESIGN_SPEC.md §2)', () => {
@@ -47,5 +47,25 @@ describe('thread view helpers (DESIGN_SPEC.md §2)', () => {
     const thread = [oldest, b, newest];
     expect(isThreadUnread(thread)).toBe(true);
     expect(unreadTargets(thread)).toEqual({ unread: false, targets: [b] });
+  });
+});
+
+describe('conversation trash and restore (DESIGN_SPEC.md §2)', () => {
+  const inbox = message({ gmailId: 'i', status: 'inbox' });
+  const trashed = message({ gmailId: 't', status: 'trash', labelIds: ['TRASH'] });
+  const sent = message({ gmailId: 's', status: 'sent', labelIds: ['SENT'] });
+
+  it('offers Restore from the Trash label, or when every message is trashed', () => {
+    expect(offersRestore([inbox, trashed], true)).toBe(true);
+    expect(offersRestore([trashed], false)).toBe(true);
+    expect(offersRestore([inbox, trashed], false)).toBe(false);
+    expect(offersRestore([], false)).toBe(false);
+  });
+
+  it('archives the inbox messages, trashes the rest, restores the trashed', () => {
+    const all = [inbox, trashed, sent];
+    expect(moveTargets('archive', all).map((m) => m.gmailId)).toEqual(['i']);
+    expect(moveTargets('trash', all).map((m) => m.gmailId)).toEqual(['i', 's']);
+    expect(moveTargets('restore', all).map((m) => m.gmailId)).toEqual(['t']);
   });
 });

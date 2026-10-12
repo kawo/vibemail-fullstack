@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { type ApiError, api, isAbort } from '../../api/client';
 import type { MessageDTO } from '../../api/types';
-import { isThreadStarred, isThreadUnread, starTargets, threadSubject, unreadTargets } from '../../lib/thread';
+import { isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '../../lib/thread';
 import { navigate } from '../../router';
 import { changeLabels, markRead, markReadInBackground, markUnread, toggleStar } from '../../state/actions';
+import { useInboxUi } from '../../state/inboxUi';
 import { asApiError, useStore } from '../../state/store';
 import { Glyph, Panel } from '../ui';
 import { MessageCard } from './MessageCard';
@@ -25,6 +26,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const { chip, searchActive } = useInboxUi();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,19 +96,19 @@ export function ThreadView({ threadId }: { threadId: string }) {
     await runEach(targets, async (m) => (await toggleStar(m)) !== null);
   };
 
-  /** Archive or trash the conversation: one PATCH at a time; a failure stops and reports (§2). */
-  const moveAll = async (kind: 'archive' | 'trash') => {
-    const targets = messages.filter((m) => (kind === 'archive' ? m.status === 'inbox' : m.status !== 'trash'));
-    const changed = await runEach(targets, async (m) =>
-      (await changeLabels(m.gmailId, kind === 'archive' ? { removeLabelIds: ['INBOX'] } : { addLabelIds: ['TRASH'] })) !== null,
-    );
+  /** Archive, trash or restore the conversation: one PATCH at a time; a failure stops and reports (§2). */
+  const moveAll = async (kind: 'archive' | 'trash' | 'restore') => {
+    const targets = moveTargets(kind, messages);
+    const change = { archive: { removeLabelIds: ['INBOX'] }, trash: { addLabelIds: ['TRASH'] }, restore: { removeLabelIds: ['TRASH'] } }[kind];
+    const changed = await runEach(targets, async (m) => (await changeLabels(m.gmailId, change)) !== null);
     if (changed < targets.length) {
       s.toast(`Changed ${changed} of ${targets.length} messages`);
       return;
     }
-    s.toast(kind === 'archive' ? 'Conversation archived' : 'Conversation moved to Trash');
+    s.toast({ archive: 'Conversation archived', trash: 'Conversation moved to Trash', restore: 'Conversation restored to the inbox' }[kind]);
     back();
   };
+  const restoring = offersRestore(messages, chip.kind === 'trash' && !searchActive);
 
   if (state === 'error') {
     const code = error?.code;
@@ -154,8 +156,10 @@ export function ThreadView({ threadId }: { threadId: string }) {
                 busy,
                 onToggleUnread: () => void toggleUnread(),
                 onToggleStar: () => void toggleConversationStar(),
+                canArchive: moveTargets('archive', messages).length > 0,
                 onArchive: () => void moveAll('archive'),
-                onTrash: () => void moveAll('trash'),
+                restore: restoring,
+                onTrash: () => void moveAll(restoring ? 'restore' : 'trash'),
               }
             : null
         }

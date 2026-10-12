@@ -5,7 +5,8 @@ import { Glyph } from '../ui';
 /**
  * The thread view's sticky header (DESIGN_SPEC.md §2): back (or close, beside the list) on the
  * left; on the right four icon buttons: the read/unread toggle, the conversation star, Archive and
- * Move to trash. Each keeps its name as its accessible label and tooltip. The controls on the
+ * Move to trash, which becomes Restore (back to the inbox) for a conversation opened from Trash or
+ * wholly in it. Archive is disabled when nothing in the conversation is in the inbox. Each keeps its name as its accessible label and tooltip. The controls on the
  * right appear once the thread has loaded; back works at once. While an action runs, a spinner
  * leads them and they are disabled.
  */
@@ -19,7 +20,10 @@ export function ThreadHeader({
     busy: boolean;
     onToggleUnread: () => void;
     onToggleStar: () => void;
+    canArchive: boolean;
     onArchive: () => void;
+    /** The last action restores the trashed messages instead of trashing. */
+    restore: boolean;
     onTrash: () => void;
   };
   onBack: () => void;
@@ -65,21 +69,34 @@ export function ThreadHeader({
             className="icon-btn"
             aria-label="Archive conversation"
             title="Archive conversation"
-            disabled={controls.busy}
+            disabled={controls.busy || !controls.canArchive}
             onClick={controls.onArchive}
           >
             <Icon name="archive" />
           </button>
-          <button
-            type="button"
-            className="icon-btn danger"
-            aria-label="Move conversation to trash"
-            title="Move conversation to trash"
-            disabled={controls.busy}
-            onClick={controls.onTrash}
-          >
-            <Icon name="trash" />
-          </button>
+          {controls.restore ? (
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Restore conversation to the inbox"
+              title="Restore conversation to the inbox"
+              disabled={controls.busy}
+              onClick={controls.onTrash}
+            >
+              <Icon name="inbox" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="icon-btn danger"
+              aria-label="Move conversation to trash"
+              title="Move conversation to trash"
+              disabled={controls.busy}
+              onClick={controls.onTrash}
+            >
+              <Icon name="trash" />
+            </button>
+          )}
         </>
       )}
     </div>

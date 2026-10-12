@@ -57,3 +57,23 @@ export function threadSubject(messages: readonly MessageDTO[]): string {
 export function fullDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * The conversation's last header action is Restore instead of Move to trash when it was opened
+ * from the Trash label, or when every message in it is in the trash (DESIGN_SPEC.md §2).
+ */
+export function offersRestore(messages: readonly MessageDTO[], fromTrash: boolean): boolean {
+  return fromTrash || (messages.length > 0 && messages.every((m) => m.status === 'trash'));
+}
+
+/** What each conversation action changes: archive the inbox ones, trash the rest, restore the trashed. */
+export function moveTargets(kind: 'archive' | 'trash' | 'restore', messages: readonly MessageDTO[]): MessageDTO[] {
+  switch (kind) {
+    case 'archive':
+      return messages.filter((m) => m.status === 'inbox');
+    case 'trash':
+      return messages.filter((m) => m.status !== 'trash');
+    case 'restore':
+      return messages.filter((m) => m.status === 'trash');
+  }
+}

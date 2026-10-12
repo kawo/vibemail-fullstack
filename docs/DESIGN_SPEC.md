@@ -150,7 +150,7 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
 ### Default state
 
 - **Placement.** From 1100px wide, the thread opens in a reading pane beside the message list, and the opened row stays highlighted; the header's close control empties the pane. Narrower, the thread replaces the list, sliding in from the right, with a back control.
-- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox. On the right, four icon buttons, each with its name as label and tooltip: the read toggle (`ring` when read, the accent `dot` when unread: "Mark as unread" / "Mark as read"), the conversation star, **Archive conversation** (`archive`) and **Move conversation to trash** (`trash`, `danger-text` on hover). While one runs, a spinner leads them and they are disabled.
+- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox. On the right, four icon buttons, each with its name as label and tooltip: the read toggle (`ring` when read, the accent `dot` when unread: "Mark as unread" / "Mark as read"), the conversation star, **Archive conversation** (`archive`; disabled when no message in it is in the inbox) and **Move conversation to trash** (`trash`, `danger-text` on hover). Opened from the Trash label, or when every message in it is trashed, the last button is **Restore conversation to the inbox** (`inbox`) instead. While one runs, a spinner leads them and they are disabled.
 - **Message cards.** One glass card per message, oldest first. The newest message is expanded and the earlier ones are collapsed.
   - **Collapsed card:** `fromAddress`, `snippet` and `internalDate`.
   - **Expanded card header:** `fromAddress`, `toAddress`, `ccAddresses` (when non-empty) and `internalDate`.
@@ -168,6 +168,7 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
 - **Star / unstar:** a per-card star, as in the inbox, through `PATCH /api/v1/messages/{id}`.
 - **Archive the conversation:** sends `PATCH /api/v1/messages/{id}` with `{ removeLabelIds: ['INBOX'] }` for every card whose `status` is `inbox`, one request at a time. When all have settled, the app returns to the inbox.
 - **Trash the conversation:** sends `{ addLabelIds: ['TRASH'] }` for every card whose `status` is not `trash`, one at a time, then returns to the inbox.
+- **Restore the conversation** (in place of trash, as above): sends `{ removeLabelIds: ['TRASH'] }` for every card whose `status` is `trash`, one at a time, toasts "Conversation restored to the inbox" and returns to the list. The server derives each restored message's new `status`.
 - **Back:** returns to the inbox with its scroll position and active chip preserved.
 
 ### Loading state
