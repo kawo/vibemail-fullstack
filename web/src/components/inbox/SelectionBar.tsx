@@ -44,6 +44,9 @@ export function SelectionBar({
   }, [onClear]);
 
   const all = selectAllState(selected.length, listed);
+  // Restore and Trash each show only when they apply; how many actions show decides when the bar
+  // has room for their words (styles.css).
+  const shown = ACTIONS.filter(({ kind }) => !((kind === 'restore' || kind === 'trash') && bulkTargets(kind, selected).length === 0));
   const run = (kind: BulkKind) => {
     const chosen = [...selected];
     onClear();
@@ -51,18 +54,14 @@ export function SelectionBar({
   };
 
   return (
-    <div className="selection-bar" role="toolbar" aria-label="Selected messages">
+    <div className="selection-bar" role="toolbar" aria-label="Selected messages" data-actions={shown.length}>
       <SelectBox state={all} label={all === 'all' ? 'Select none' : 'Select all'} onToggle={() => onSelectAll(all !== 'all')} />
       <span className="selection-count" aria-live="polite">
         {selected.length} selected
       </span>
       <div className="selection-actions">
-        {ACTIONS.map(({ kind, label, icon, danger }) => {
+        {shown.map(({ kind, label, icon, danger }) => {
           const count = bulkTargets(kind, selected).length;
-          // Restore appears only when something selected is in the trash; Trash only when something isn't.
-          if ((kind === 'restore' || kind === 'trash') && count === 0) {
-            return null;
-          }
           return (
             <button
               key={kind}

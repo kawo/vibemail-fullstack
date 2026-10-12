@@ -1161,10 +1161,12 @@ button {
   opacity: 0.5;
 }
 
-/* Narrow lists (phones, and the list pane beside a thread) show the actions as icons; each keeps
-   its name as its accessible label and tooltip. */
-@container list (max-width: 420px) {
-  .bulk-btn .bulk-label {
+/* A list pane too narrow for the words (phones, and the list pane beside a thread) shows the
+   actions as icons; each keeps its name as its accessible label and tooltip. Three labelled
+   actions need about 470px with a three-digit count, four about 570px; the thresholds leave a
+   margin so the last action never runs under the close x. */
+@container list (max-width: 489.98px) {
+  .selection-bar .bulk-btn .bulk-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1173,7 +1175,24 @@ button {
     white-space: nowrap;
   }
 
-  .bulk-btn {
+  .selection-bar .bulk-btn {
+    min-width: var(--size-control-sm);
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+@container list (max-width: 589.98px) {
+  .selection-bar[data-actions='4'] .bulk-btn .bulk-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .selection-bar[data-actions='4'] .bulk-btn {
     min-width: var(--size-control-sm);
     justify-content: center;
     padding: 0;

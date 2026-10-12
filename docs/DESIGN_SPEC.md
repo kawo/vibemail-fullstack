@@ -85,7 +85,7 @@ Several messages can be marked unread, archived, trashed or restored at once. Th
   - **Archive** applies to those whose `status` is `inbox`: `{ removeLabelIds: ['INBOX'] }`.
   - **Trash** (in `danger-text`) applies to those not in the trash: `{ addLabelIds: ['TRASH'] }`. It is hidden when every selected message is trashed.
   - **Restore** (`inbox` icon) applies to those in the trash: `{ removeLabelIds: ['TRASH'] }`. It is shown only when a selected message is trashed.
-  - An action with nothing to apply to is disabled. In a narrow list pane (420px or less) the actions show as icons, each keeping its name as its label and tooltip.
+  - An action with nothing to apply to is disabled. When the list pane is too narrow for their words (under 490px with three actions, under 590px with four), the actions show as icons, each keeping its name as its label and tooltip, so none runs under the close `x`.
 - **Running.** Choosing an action clears the selection and dims every affected row at once; each row is replaced by its returned `message` as it completes. Marking unread shows rows unread straight away.
 - **Result.** One toast sums it up: "3 messages archived", or "2 of 3 messages archived. Couldn't update the rest." Archive, trash and restore offer Undo for 5 seconds, which sends the inverse change for the messages that succeeded.
 - **Errors.**
