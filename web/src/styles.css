@@ -113,7 +113,8 @@
    and soft navy shadows, near-black text. The accent keeps its one value. Every text token keeps
    4.5:1 on its grounds (stone 4.6:1 for punctuation, ash 3.5:1 for disabled text, as in dark);
    the star keeps 3:1 as an icon, and words in warning use warning-text. */
-:root[data-theme='light'] {
+:root[data-theme='light'],
+[data-theme='light'] {
   color-scheme: light;
 
   --canvas: #e9edf6;
@@ -196,8 +197,8 @@ body {
   min-height: 100dvh;
   font-family: var(--font-mono);
   color: var(--ink);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   background:
     radial-gradient(60vmax 50vmax at 72% 20%, var(--backdrop-bloom), rgba(88, 86, 214, 0) 70%),
     linear-gradient(180deg, var(--backdrop-top) 0%, var(--backdrop-bottom) 100%);
@@ -331,8 +332,8 @@ button {
     height: 100%;
     margin: 0;
     color: var(--mute);
-    font-size: calc(13px * var(--text-scale));
-    line-height: calc(20px * var(--text-scale));
+    font-size: calc(13px * var(--text-scale, 1));
+    line-height: calc(20px * var(--text-scale, 1));
   }
 
 }
@@ -460,8 +461,8 @@ button {
   margin: var(--space-lg) 0 var(--space-xs);
   padding-left: var(--space-sm);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
 }
 
@@ -469,8 +470,8 @@ button {
   margin: 0;
   padding-left: var(--space-sm);
   color: var(--row-snippet);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 /* A label: the same active treatment the filter chips had (accent border, brightest fill). */
@@ -486,8 +487,8 @@ button {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--body);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   text-align: left;
 }
@@ -530,8 +531,8 @@ button {
   flex: none;
   padding-left: var(--space-sm);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
@@ -621,7 +622,7 @@ button {
 
 /* The toggle in the sidebar header: beside the content only (phones show the panel's close). */
 .collapse-toggle {
-  font-size: calc(14px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
 }
 
 /* Icons only (768px and wider): a narrow strip of icon buttons. Names become tooltips and stay
@@ -664,7 +665,7 @@ button {
 
   .sidebar.collapsed .nav-glyph {
     width: auto;
-    font-size: calc(12px * var(--text-scale));
+    font-size: calc(12px * var(--text-scale, 1));
   }
 
   /* The "Labels" heading becomes a rule between the fixed and custom labels. */
@@ -692,8 +693,8 @@ button {
     border-radius: var(--radius-sm);
     background: linear-gradient(var(--surface-card), var(--surface-card)), var(--glass-tint);
     color: var(--ink);
-    font-size: calc(10px * var(--text-scale));
-    line-height: calc(12px * var(--text-scale));
+    font-size: calc(10px * var(--text-scale, 1));
+    line-height: calc(12px * var(--text-scale, 1));
     text-align: center;
   }
 
@@ -763,8 +764,8 @@ button {
 /* The active label's name heads the list (the filter bar it replaces used to show it). */
 .list-title {
   margin: 0;
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 700;
   color: var(--row-sender);
 }
@@ -790,16 +791,16 @@ button {
 
 .brand {
   font-weight: 700;
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   white-space: nowrap;
 }
 
 .synced {
   margin: 0 0 0 auto;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   white-space: nowrap;
 }
 
@@ -855,8 +856,8 @@ button {
   background: transparent;
   border: 0;
   outline: none;
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(18px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(18px * var(--text-scale, 1));
 }
 
 .search input::placeholder {
@@ -879,8 +880,8 @@ button {
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--mute);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   flex: none;
 }
@@ -906,8 +907,8 @@ button {
   color: var(--mute);
   padding: 0 var(--space-sm);
   border-radius: var(--radius-sm);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -950,8 +951,8 @@ button {
   background: var(--surface-soft);
   box-shadow: var(--glass-highlight), var(--glass-1);
   color: var(--ink);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -979,7 +980,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--primary);
   color: var(--on-primary);
-  font-size: calc(16px * var(--text-scale));
+  font-size: calc(16px * var(--text-scale, 1));
   line-height: 2;
   font-weight: 500;
   white-space: nowrap;
@@ -999,8 +1000,8 @@ button {
 .primary-btn.sm {
   height: 32px;
   padding: 0 var(--space-lg);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
 }
 
 /* ---------- Message list ---------- */
@@ -1212,8 +1213,8 @@ button {
 
 .selection-count {
   color: var(--ink);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1285,8 +1286,8 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   color: var(--row-sender);
 }
@@ -1297,8 +1298,8 @@ button {
   align-items: center;
   gap: var(--space-xs);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   white-space: nowrap;
 }
 
@@ -1314,8 +1315,8 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(18px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(18px * var(--text-scale, 1));
 }
 
 .row .subject {
@@ -1359,8 +1360,8 @@ button {
    the filled star in warning when starred; the outline in ink at low strength when not, full strength on hover. */
 .star {
   min-width: var(--size-control-sm);
-  font-size: calc(16px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(16px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   transition: opacity 120ms ease;
 }
 
@@ -1391,8 +1392,8 @@ button {
   border-radius: var(--radius-sm);
   background: var(--surface-card);
   color: var(--on-dark);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
 }
 
@@ -1433,8 +1434,8 @@ mark {
   background: transparent;
   padding: 6px var(--space-sm);
   border-radius: var(--radius-sm);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(18px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(18px * var(--text-scale, 1));
   color: var(--ink);
 }
 
@@ -1526,8 +1527,8 @@ mark {
   padding: var(--space-sm) var(--space-md);
   min-height: 36px;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -1584,8 +1585,8 @@ mark {
   gap: var(--space-sm);
   padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xs);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 .result-count p {
@@ -1601,8 +1602,8 @@ mark {
   margin: 0;
   padding: var(--space-xs) var(--space-md);
   color: var(--danger-text);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 /* ---------- Panels and empty states ---------- */
@@ -1617,15 +1618,15 @@ mark {
 
 .panel .mark {
   font-weight: 700;
-  font-size: calc(16px * var(--text-scale));
-  line-height: calc(24px * var(--text-scale));
+  font-size: calc(16px * var(--text-scale, 1));
+  line-height: calc(24px * var(--text-scale, 1));
   color: var(--stone);
 }
 
 .panel h1,
 .panel h2 {
   margin: 0;
-  font-size: calc(16px * var(--text-scale));
+  font-size: calc(16px * var(--text-scale, 1));
   line-height: 1.5;
   font-weight: 700;
 }
@@ -1633,8 +1634,8 @@ mark {
 .panel p {
   margin: 0;
   color: var(--body);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(22px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(22px * var(--text-scale, 1));
   max-width: 420px;
 }
 
@@ -1656,16 +1657,16 @@ mark {
 
 .empty h2 {
   margin: 0 0 var(--space-xs);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 700;
 }
 
 .empty p {
   margin: 0;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 /* ---------- Thread view ---------- */
@@ -1719,8 +1720,8 @@ mark {
 .thread-title {
   margin: 0 0 var(--space-sm);
   padding: 0 var(--space-xs);
-  font-size: calc(20px * var(--text-scale));
-  line-height: calc(28px * var(--text-scale));
+  font-size: calc(20px * var(--text-scale, 1));
+  line-height: calc(28px * var(--text-scale, 1));
   font-weight: 700;
   color: var(--row-sender);
   overflow-wrap: anywhere;
@@ -1745,8 +1746,8 @@ mark {
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   color: var(--body);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   background: var(--surface-dark-elevated);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
@@ -1773,13 +1774,13 @@ mark {
 .avatar.md {
   width: var(--size-avatar);
   height: var(--size-avatar);
-  font-size: calc(12px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
 }
 
 .avatar.sm {
   width: var(--size-avatar-sm);
   height: var(--size-avatar-sm);
-  font-size: calc(10px * var(--text-scale));
+  font-size: calc(10px * var(--text-scale, 1));
 }
 
 .avatar.self {
@@ -1814,8 +1815,8 @@ mark {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   color: var(--row-sender);
 }
@@ -1827,7 +1828,7 @@ mark {
 /* The sender's address beside the name: quieter and lighter, so the name still leads. */
 .card-head .who-mail {
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 400;
 }
 
@@ -1837,8 +1838,8 @@ mark {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--row-snippet);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(18px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(18px * var(--text-scale, 1));
 }
 
 .card-head .when {
@@ -1846,8 +1847,8 @@ mark {
   align-items: center;
   gap: var(--space-sm);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   white-space: nowrap;
 }
 
@@ -1856,7 +1857,7 @@ mark {
   place-items: center;
   width: 20px;
   color: var(--mute);
-  font-size: calc(16px * var(--text-scale));
+  font-size: calc(16px * var(--text-scale, 1));
   transition: transform 160ms ease;
 }
 
@@ -1871,8 +1872,8 @@ mark {
 }
 
 .card.expanded .card-head .who {
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
 }
 
 .card-main {
@@ -1883,8 +1884,8 @@ mark {
 .card .addr {
   padding-bottom: var(--space-sm);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   overflow-wrap: anywhere;
   border-bottom: 1px solid var(--hairline);
 }
@@ -1895,8 +1896,8 @@ mark {
   margin: 0;
   padding: var(--space-md) 0;
   color: var(--body);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(22px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(22px * var(--text-scale, 1));
 }
 
 .card .html-body {
@@ -1921,8 +1922,8 @@ mark {
 
 .attachment {
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   overflow-wrap: anywhere;
 }
 
@@ -2054,7 +2055,7 @@ mark {
   white-space: nowrap;
   overflow: hidden;
   font-weight: 700;
-  line-height: calc(18px * var(--text-scale));
+  line-height: calc(18px * var(--text-scale, 1));
 }
 
 .drawer-title > span:first-child {
@@ -2076,8 +2077,8 @@ mark {
 .save-state {
   min-height: 16px;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 400;
   white-space: nowrap;
 }
@@ -2107,8 +2108,8 @@ mark {
   border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
   white-space: nowrap;
 }
@@ -2138,8 +2139,8 @@ mark {
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--surface-card);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
@@ -2168,8 +2169,8 @@ mark {
 
 .field label {
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   width: 64px;
   flex: none;
   align-self: flex-start;
@@ -2183,8 +2184,8 @@ mark {
   border: 0;
   outline: none;
   padding: 10px 0;
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 500;
 }
 
@@ -2221,8 +2222,8 @@ mark {
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-sm);
   background: var(--surface-card);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -2275,8 +2276,8 @@ mark {
   border: 0;
   outline: none;
   padding: var(--space-md);
-  font-size: calc(14px * var(--text-scale));
-  line-height: calc(22px * var(--text-scale));
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: calc(22px * var(--text-scale, 1));
 }
 
 /* The replied message, below the body and quieter than it. */
@@ -2287,8 +2288,8 @@ mark {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--row-snippet);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
 }
 
 /* Draft restored: a quiet note and chip under the body, gone after the first edit. */
@@ -2303,8 +2304,8 @@ mark {
 
 .restored-note {
   color: var(--row-snippet);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 .restored-chip {
@@ -2314,8 +2315,8 @@ mark {
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
   color: var(--ink);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
   opacity: 0.62;
   transition: opacity 120ms ease;
@@ -2328,8 +2329,8 @@ mark {
 
 .field-error {
   color: var(--danger-text);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   padding: var(--space-xs) var(--space-md) var(--space-xs) calc(var(--space-md) + 72px);
   border-bottom: 1px solid var(--hairline);
 }
@@ -2347,8 +2348,8 @@ mark {
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
   background: var(--surface-dark-elevated);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   color: var(--body);
   display: flex;
   gap: var(--space-sm);
@@ -2407,8 +2408,8 @@ mark {
   min-height: 40px;
   padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(18px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(18px * var(--text-scale, 1));
 }
 
 .toast span {
@@ -2447,7 +2448,7 @@ mark {
 
 .signin h1 {
   margin: 0;
-  font-size: calc(38px * var(--text-scale));
+  font-size: calc(38px * var(--text-scale, 1));
   line-height: 1.2;
   font-weight: 700;
 }
@@ -2493,8 +2494,8 @@ mark {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 .settings-btn[aria-expanded='true'] {
@@ -2544,8 +2545,8 @@ mark {
 .settings-title {
   margin: 0;
   color: var(--ink);
-  font-size: calc(13px * var(--text-scale));
-  line-height: calc(20px * var(--text-scale));
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: calc(20px * var(--text-scale, 1));
   font-weight: 700;
 }
 
@@ -2560,8 +2561,8 @@ mark {
   padding: 0;
   margin-bottom: var(--space-xs);
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
 }
 
@@ -2585,8 +2586,8 @@ mark {
   border: 1px solid transparent;
   border-radius: 3px;
   color: var(--body);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
   font-weight: 500;
   cursor: pointer;
 }
@@ -2622,8 +2623,8 @@ mark {
 .settings-note {
   margin: var(--space-xs) 0 0;
   color: var(--mute);
-  font-size: calc(12px * var(--text-scale));
-  line-height: calc(16px * var(--text-scale));
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
 }
 
 /* ---------- Touch screens ---------- */
