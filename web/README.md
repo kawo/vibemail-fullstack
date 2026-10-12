@@ -52,7 +52,8 @@ With `npm run dev` running, `/gallery.html` shows the compose drawer's states an
 | §4 Label filter rules | `src/lib/filters.ts` |
 | §4 Drafts (`GET /api/v1/drafts`) | `src/components/drafts/` (`DraftsView`, `DraftRow`), `src/state/drafts.ts`, `src/lib/drafts.ts` |
 | §5 Search | `src/components/search/` (`SearchView`, `SearchResultList`); the field is `inbox/SearchBar` |
-| Visual direction (VibeMail Glass design system tokens) | `src/styles.css` |
+| §4 Account and Settings (theme, text size) | `src/components/sidebar/` (`AccountFooter`, `SettingsPanel`, `useAccountEmail`), `src/lib/preferences.ts`, `src/state/preferences.ts` |
+| Visual direction (VibeMail Glass design system tokens) | `src/styles.css` | (dark and light themes, `--text-scale`)
 
 Two contract invariants are enforced by the request types in `src/api/types.ts`:
 - **`status`:** no request type has a `status` field; it changes only through labels.

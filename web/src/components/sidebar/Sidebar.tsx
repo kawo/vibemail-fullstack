@@ -5,6 +5,7 @@ import { loadSidebarCollapsed, saveSidebarCollapsed } from '../../lib/sidebarWid
 import { loadDrafts, useDrafts } from '../../state/drafts';
 import { useInboxUi, useLoadedMessages } from '../../state/inboxUi';
 import { Glyph } from '../ui';
+import { AccountFooter } from './AccountFooter';
 import { LabelNav } from './LabelNav';
 import { SidebarResizer } from './SidebarResizer';
 
@@ -15,6 +16,8 @@ import { SidebarResizer } from './SidebarResizer';
  * On a phone it is a panel that slides in from the left (opened from the header's menu button),
  * over a scrim; choosing a label, Compose, the scrim or Escape closes it, and focus returns to
  * the menu button. Closed, it is `inert`, so it is out of the tab order.
+ *
+ * Its foot holds the signed-in email and Settings (theme, text size).
  *
  * Beside the content, a toggle in its header collapses it to icons only (labels become tooltips
  * and stay in the accessible name); the mode is remembered on the device.
@@ -119,6 +122,7 @@ export function Sidebar() {
           <Glyph name="compose" /> <span className="compose-label">Compose</span>
         </button>
         <LabelNav chips={chips} counts={counts} openEnded={openEnded} active={chip} searching={searchActive} collapsed={collapsed} onSelect={selectChip} />
+        <AccountFooter collapsed={collapsed} inline={asPanel} />
       </aside>
       {wide && <SidebarResizer collapsed={collapsed} />}
     </>

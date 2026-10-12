@@ -138,6 +138,15 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 - **From a thread or a search.** Choosing a label returns to the inbox list on that label, ending any search.
 - **Filtering.** Chip behaviour, matching rules and states are specified in §4 (Label filter).
 
+### Account and Settings
+
+- **Account.** The foot of the sidebar shows the signed-in account's email (the Supabase session's `user.email`), after an initial in an avatar, truncated with the full address as a tooltip. Icons only, just the initial shows, with the email as its tooltip.
+- **Settings.** Under the email, a **Settings** button (`sliders` icon) opens a raised-glass Settings panel above the account block (beside the button when the sidebar shows icons only; inside the panel on phones, so it stays within that dialog). It holds two radio groups:
+  - **Appearance:** Dark (the default), Light, or System, which follows the device's light or dark setting as it changes.
+  - **Text size:** Small, Default, Large, Larger, each shown as an "A" at that size. Every font size and line height scales with it (0.9, 1, 1.12, 1.25); spacing and icons keep their size.
+- A change applies at once and is kept on the device; it is applied before the first paint, so the page never flashes the other theme. Escape, a click outside, or the button again closes the panel, and focus returns to the button.
+- **Light theme.** The same glass over a pale blue-grey ground: white glass rising toward white, navy hairlines and shadows, near-black text, a dark primary button. The accent keeps its one value. Every text token keeps 4.5:1 on its grounds, as in dark; the star keeps 3:1 as an icon, so words in warning (Not saved) use a darker `warning-text`.
+
 ---
 
 ## 2. Thread view
