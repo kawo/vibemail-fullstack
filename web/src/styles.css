@@ -1747,6 +1747,13 @@ mark {
   font-weight: 700;
 }
 
+/* The sender's address beside the name: quieter and lighter, so the name still leads. */
+.card-head .who-mail {
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .card-head .collapsed-snippet {
   min-width: 0;
   overflow: hidden;

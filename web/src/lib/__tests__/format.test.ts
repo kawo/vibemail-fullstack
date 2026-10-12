@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { displayName, formatSize, highlight, relativeTime } from '../format';
+import { addressBesideName, displayName, emailAddress, formatSize, highlight, relativeTime } from '../format';
 
 describe('format helpers', () => {
+  it('takes the bare address, and shows it beside a name only when it adds something', () => {
+    expect(emailAddress('Lena Ortiz <lena@northwind.example>')).toBe('lena@northwind.example');
+    expect(emailAddress('lena@northwind.example')).toBe('lena@northwind.example');
+    expect(addressBesideName('Lena Ortiz <lena@northwind.example>', 'Lena Ortiz')).toBe('lena@northwind.example');
+    expect(addressBesideName('lena@northwind.example', 'lena@northwind.example')).toBeNull();
+    expect(addressBesideName('<Lena@Northwind.example>', 'lena@northwind.example')).toBeNull();
+  });
+
   it('shows the display name of Name <addr>, else the address', () => {
     expect(displayName('Ada Lovelace <ada@example.com>')).toBe('Ada Lovelace');
     expect(displayName('"Ada" <ada@example.com>')).toBe('Ada');

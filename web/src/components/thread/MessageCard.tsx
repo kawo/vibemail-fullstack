@@ -1,6 +1,6 @@
 import type { MessageDTO } from '../../api/types';
 import { useCompose } from '../../compose/ComposeContext';
-import { displayName, formatSize, relativeTime } from '../../lib/format';
+import { addressBesideName, displayName, formatSize, relativeTime } from '../../lib/format';
 import { fullDate } from '../../lib/thread';
 import { toggleStar } from '../../state/actions';
 import { HtmlBody } from '../HtmlBody';
@@ -30,6 +30,8 @@ export function MessageCard({
   const sent = message.status === 'sent';
   const badge = message.status === 'trash' || message.status === 'spam' || message.status === 'archived';
   const name = sent ? 'You' : displayName(message.fromAddress);
+  // The sender's address in brackets beside the name, unless the name already is the address.
+  const mail = addressBesideName(message.fromAddress, name);
   const time = (
     <time dateTime={message.internalDate} title={fullDate(message.internalDate)}>
       {relativeTime(message.internalDate)}
@@ -44,10 +46,13 @@ export function MessageCard({
       role="button"
       tabIndex={0}
       aria-expanded={expanded}
-      aria-label={`${name}, ${fullDate(message.internalDate)}${message.isRead ? '' : ', unread'}`}
+      aria-label={`${name}${mail ? ` (${mail})` : ''}, ${fullDate(message.internalDate)}${message.isRead ? '' : ', unread'}`}
     >
       <Avatar fromAddress={message.fromAddress} size={expanded ? 'md' : 'sm'} self={sent} />
-      <span className={`who${message.isRead ? '' : ' unread'}`}>{name}</span>
+      <span className={`who${message.isRead ? '' : ' unread'}`} title={mail ?? undefined}>
+        {name}
+        {mail && <span className="who-mail"> ({mail})</span>}
+      </span>
       {expanded ? <span className="fill" /> : <span className="collapsed-snippet">{message.snippet}</span>}
       <span className="when">
         {badge && <span className={`badge ${message.status}`}>{message.status}</span>}
