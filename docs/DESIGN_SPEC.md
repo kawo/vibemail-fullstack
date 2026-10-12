@@ -92,7 +92,7 @@ Several messages can be marked unread or read, archived, trashed or restored at 
   - `MESSAGE_NOT_FOUND` drops that message from the cache, and the toast says "The rest no longer exist."
   - `GMAIL_RATE_LIMITED` stops the rest: "Gmail is busy, try again in {n}s. 2 of 5 messages archived."
   - `UNAUTHENTICATED`, `GMAIL_NOT_CONNECTED` and `GMAIL_TOKEN_REVOKED` stop the rest and follow the shared rules.
-- **Clearing.** The close `x`, Escape (unless the compose drawer is open), choosing a label, changing or ending a search, and Archive, Trash or Restore clear the selection.
+- **Clearing.** The close `x`, Escape (unless the compose drawer is open), a click or tap anywhere outside the rows and the selection bar (the reading pane, the sidebar, the search field, the empty space below the list), choosing a label, changing or ending a search, and Archive, Trash or Restore clear the selection. Clicks on a toast, a menu or the compose drawer keep it, and a scroll that starts outside never clears it.
 
 ### Loading state
 

@@ -6,6 +6,9 @@ import { type IconName, Icon } from '../icons';
 import { Glyph } from '../ui';
 import { SelectBox } from './SelectBox';
 
+/** Where a click keeps the selection: rows, this bar, and what floats over the list. */
+const KEEPS_SELECTION = '.row, .selection-bar, .toasts, .menu, .drawer, .scrim, .select-box';
+
 type Action = { kind: BulkKind; label: string; icon: IconName; danger?: boolean; pressed?: boolean };
 
 /** The read toggle, like the thread header's: a ring while marking unread, the accent dot once all are unread. */
@@ -25,7 +28,8 @@ const MOVES: Action[] = [
  * select-all box, "{n} selected", the bulk actions and a close control. It sticks under the search
  * bar while the list scrolls. An action applies to the selected messages it can change. Archive,
  * Trash and Restore then clear the selection; the read toggle keeps it, so clicking it again
- * undoes it (Mark unread, then Mark read). Escape clears it too.
+ * undoes it (Mark unread, then Mark read). Escape clears it too, and so does a click anywhere
+ * outside the rows and this bar (a toast, a menu or the compose drawer don't count).
  */
 export function SelectionBar({
   selected,
@@ -47,8 +51,20 @@ export function SelectionBar({
         onClear();
       }
     };
+    // A click (not a press, so a scroll that starts elsewhere keeps the selection) outside the
+    // rows, the bar and the floating layers clears the selection.
+    const onClick = (e: MouseEvent) => {
+      // A target no longer in the page was re-rendered by the click itself (the read toggle).
+      if (e.target instanceof Element && e.target.isConnected && !e.target.closest(KEEPS_SELECTION)) {
+        onClear();
+      }
+    };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('click', onClick);
+    };
   }, [onClear]);
 
   const all = selectAllState(selected.length, listed);
@@ -77,7 +93,7 @@ export function SelectionBar({
           const count = bulkTargets(kind, selected).length;
           return (
             <button
-              key={kind}
+              key={pressed === undefined ? kind : 'read-toggle'}
               type="button"
               className={`text-btn bulk-btn${danger ? ' danger' : ''}${pressed !== undefined ? ` read-toggle${pressed ? ' on' : ''}` : ''}`}
               aria-pressed={pressed}
