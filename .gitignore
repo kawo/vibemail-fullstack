@@ -6,3 +6,8 @@ coverage/
 jest-results.json
 
 .vercel
+
+# Web client (Next.js)
+.next/
+out/
+*.tsbuildinfo

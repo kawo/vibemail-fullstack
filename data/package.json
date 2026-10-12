@@ -1,0 +1,4 @@
+{
+  "//": "data.js is an ES module; the repo root is CommonJS (the engine). Keep data.js intact.",
+  "type": "module"
+}

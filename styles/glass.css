@@ -1,0 +1,70 @@
+/*
+ * The glass ladder (design system README › Glass): level 2 cards and raised panels. Rows,
+ * headers, the sidebar and the drawer apply the same tokens in app.css. Always write
+ * -webkit-backdrop-filter before backdrop-filter: in the other order CSS minifiers drop the
+ * standard property and Chrome gets no blur.
+ */
+
+/* ---------- Glass ladder ---------- */
+.glass {
+  background: var(--surface-card);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-highlight), var(--glass-2);
+  -webkit-backdrop-filter: var(--blur-2);
+  backdrop-filter: var(--blur-2);
+  border-radius: var(--radius-none);
+}
+
+.glass-raised {
+  background: linear-gradient(var(--surface-raised), var(--surface-raised)), var(--glass-tint);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--glass-highlight), var(--glass-raised);
+  -webkit-backdrop-filter: var(--blur-raised);
+  backdrop-filter: var(--blur-raised);
+  border-radius: var(--radius-none);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-raised,
+  .row,
+  .topbar,
+  .thread-head {
+    background-color: var(--surface-dark);
+  }
+}
+
+/* ---------- Implementation flags ---------- */
+
+/* 1. Reduced motion also means less glass work: every blur (all 22 backdrop-filters read these
+      tokens) is capped at 8px. */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  [data-theme='light'] {
+    --blur-1: blur(8px);
+    --blur-2: blur(8px);
+    --blur-3: blur(8px);
+    --blur-raised: blur(8px);
+  }
+}
+
+/* 2. Small screens get firmer glass edges: card and panel borders rise to 22% white (dark), or
+      22% navy in the light theme, where white edges would vanish. */
+@media (max-width: 767.98px) {
+  :root {
+    --glass-edge: rgba(255, 255, 255, 0.22);
+    --hairline-strong: rgba(255, 255, 255, 0.22);
+  }
+
+  :root[data-theme='light'],
+  [data-theme='light'] {
+    --glass-edge: rgba(15, 23, 42, 0.22);
+    --hairline-strong: rgba(15, 23, 42, 0.22);
+  }
+}
+
+/* 3. The fixed Compose button clears the home indicator: its fixed wrapper pads the bottom by
+      24px plus the safe area, so the button itself keeps its size (app.css, .compose-fab). */
+.compose-fab {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}

@@ -22,12 +22,22 @@ Any change to an endpoint, an `ErrorCode` or a stored field goes into `CONTRACT.
 - **Database:** the Supabase JS client, using a single service-role client. There is no anon key.
 - **Auth tokens:** `jsonwebtoken` verifies Supabase access tokens.
 - **Tests:** Jest via `ts-jest`, plus `supertest`. `supertest` needs a small adapter, because the handlers take a Web `Request` rather than a Node `http.Server`.
-- **Deployment:** Vercel Functions under top-level `api/`, with no framework. Each file exports `GET`/`POST(request: Request): Promise<Response>` on the Node.js runtime (never Edge). `vercel.json` holds the cron job, the per-function `maxDuration`, and the `/webhook/gmail` rewrite.
+- **Deployment:** Vercel Functions under top-level `api/`, with no framework (the engine; the Next.js web client beside it is separate, see Web client). Each file exports `GET`/`POST(request: Request): Promise<Response>` on the Node.js runtime (never Edge). `vercel.json` holds the cron job, the per-function `maxDuration`, and the `/webhook/gmail` rewrite.
 - **Two tsconfigs.** `tsconfig.json` keeps `rootDir: ./src` while also including `api/`, so plain `tsc` fails with TS6059. Never run bare `tsc`; Vercel compiles `api/` itself.
   - **Type-checking:** always via `tsconfig.check.json`, which extends the base config with `rootDir: "."`, `noEmit`, `tests/`, and `types: ["node", "jest"]`. TypeScript 6 no longer loads `@types/*` packages automatically.
   - **Target is ES2020:** there is no `Error.cause` or other ES2022 library API. Declare such fields explicitly (see `ProviderError`).
   - **Jest:** `jest.config.js` (CommonJS; a `.ts` config fails to load as an ES module) points ts-jest at `tsconfig.check.json`.
 - **Blocked install scripts:** npm blocked them for `esbuild`, `unrs-resolver` and `@parcel/watcher`. If `vercel dev` or Jest resolution fails, check `npm install-scripts ls`.
+
+## Web client
+
+The VibeMail Glass web client is a Next.js 15 (App Router) + React 19 app at the repo root, beside the engine. It never imports from `api/` or `src/`, and talks to the engine only over CONTRACT.md §4.
+
+- **Layout:** `app/` holds the routes only: `auth/`, `auth/callback/`, `(mail)/inbox`, `(mail)/thread/[threadId]`. `components/` holds the UI (one `MessageRow`; `ComposeDrawer` with a `mode` prop). `lib/` holds pure logic and its tests, `state/` the client stores, `services/` the data layer (`DataSource`: `sampleSource` in Phase 1, `httpSource` in Phase 2), `styles/` the glass CSS and design-system tokens, and `data/data.js` the sample data. Keep `data.js` intact; `data/package.json` marks it as an ES module because the root is CommonJS.
+- **Config:** `next.config.ts`, `tsconfig.next.json` (Next type-checks with this, never with the engine's `tsconfig.json`) and `vitest.config.mts`.
+- **Commands:** `npm run web:dev` (port 3001, the engine's default `FRONTEND_URL`), `web:build`, `web:start`, `web:test` (Vitest) and `web:typecheck`. The engine's `build`, `test`, `dev` and `typecheck` are unchanged and never look at the web client.
+- **Shared files:** root `package.json`, `package-lock.json`, `.gitignore` and `.env.example` carry web entries next to the engine's. They are server-session-owned, so coordinate when the web branch merges into `main`.
+- **Deploy:** not set up yet. `vercel.json` is the engine's, and a Next.js project at this root would read it too. Decide on deployment separately.
 
 ## Commands
 
