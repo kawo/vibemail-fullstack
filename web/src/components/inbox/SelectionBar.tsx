@@ -1,13 +1,20 @@
 import { useEffect } from 'react';
 import type { MessageDTO } from '../../api/types';
-import { type BulkKind, bulkTargets, selectAllState } from '../../lib/selection';
+import { type BulkKind, bulkTargets, keepsSelection, readToggle, selectAllState } from '../../lib/selection';
 import { bulk } from '../../state/actions';
 import { type IconName, Icon } from '../icons';
 import { Glyph } from '../ui';
 import { SelectBox } from './SelectBox';
 
-const ACTIONS: { kind: BulkKind; label: string; icon: IconName; danger?: boolean }[] = [
-  { kind: 'unread', label: 'Mark unread', icon: 'dot' },
+type Action = { kind: BulkKind; label: string; icon: IconName; danger?: boolean; pressed?: boolean };
+
+/** The read toggle, like the thread header's: a ring while marking unread, the accent dot once all are unread. */
+const READ_TOGGLE: Record<'read' | 'unread', Action> = {
+  unread: { kind: 'unread', label: 'Mark unread', icon: 'ring', pressed: false },
+  read: { kind: 'read', label: 'Mark read', icon: 'dot', pressed: true },
+};
+
+const MOVES: Action[] = [
   { kind: 'archive', label: 'Archive', icon: 'archive' },
   { kind: 'restore', label: 'Restore', icon: 'inbox' },
   { kind: 'trash', label: 'Trash', icon: 'trash', danger: true },
@@ -16,8 +23,9 @@ const ACTIONS: { kind: BulkKind; label: string; icon: IconName; danger?: boolean
 /**
  * Replaces the list header while messages are selected (DESIGN_SPEC.md §1 Selection): the
  * select-all box, "{n} selected", the bulk actions and a close control. It sticks under the search
- * bar while the list scrolls. An action applies to the selected messages it can change, then the
- * selection clears. Escape clears it too.
+ * bar while the list scrolls. An action applies to the selected messages it can change. Archive,
+ * Trash and Restore then clear the selection; the read toggle keeps it, so clicking it again
+ * undoes it (Mark unread, then Mark read). Escape clears it too.
  */
 export function SelectionBar({
   selected,
@@ -46,10 +54,15 @@ export function SelectionBar({
   const all = selectAllState(selected.length, listed);
   // Restore and Trash each show only when they apply; how many actions show decides when the bar
   // has room for their words (styles.css).
-  const shown = ACTIONS.filter(({ kind }) => !((kind === 'restore' || kind === 'trash') && bulkTargets(kind, selected).length === 0));
+  const shown = [
+    READ_TOGGLE[readToggle(selected)],
+    ...MOVES.filter(({ kind }) => !((kind === 'restore' || kind === 'trash') && bulkTargets(kind, selected).length === 0)),
+  ];
   const run = (kind: BulkKind) => {
     const chosen = [...selected];
-    onClear();
+    if (!keepsSelection(kind)) {
+      onClear();
+    }
     void bulk(kind, chosen);
   };
 
@@ -60,13 +73,14 @@ export function SelectionBar({
         {selected.length} selected
       </span>
       <div className="selection-actions">
-        {shown.map(({ kind, label, icon, danger }) => {
+        {shown.map(({ kind, label, icon, danger, pressed }) => {
           const count = bulkTargets(kind, selected).length;
           return (
             <button
               key={kind}
               type="button"
-              className={`text-btn bulk-btn${danger ? ' danger' : ''}`}
+              className={`text-btn bulk-btn${danger ? ' danger' : ''}${pressed !== undefined ? ` read-toggle${pressed ? ' on' : ''}` : ''}`}
+              aria-pressed={pressed}
               disabled={count === 0}
               title={label}
               aria-label={label}

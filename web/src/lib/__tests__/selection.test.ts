@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bulkSummary, bulkTargets, selectAllState, toggleSelection } from '../selection';
+import { bulkSummary, bulkTargets, keepsSelection, readToggle, selectAllState, toggleSelection } from '../selection';
 import { message } from './fixtures';
 
 describe('multi-select (DESIGN_SPEC.md §1 Selection)', () => {
@@ -34,9 +34,20 @@ describe('multi-select (DESIGN_SPEC.md §1 Selection)', () => {
     const all = [read, unread, archived, trashed, sent];
     const ids = (kind: Parameters<typeof bulkTargets>[0]) => bulkTargets(kind, all).map((m) => m.gmailId);
     expect(ids('unread')).toEqual(['r', 'a', 't', 's']);
+    expect(ids('read')).toEqual(['u']);
     expect(ids('archive')).toEqual(['r', 'u']);
     expect(ids('trash')).toEqual(['r', 'u', 'a', 's']);
     expect(ids('restore')).toEqual(['t']);
+  });
+
+  it('the read button marks unread until every selected message is unread, then marks read', () => {
+    const read = message({ gmailId: 'r', isRead: true });
+    const unread = message({ gmailId: 'u', isRead: false });
+    expect(readToggle([read, unread])).toBe('unread');
+    expect(readToggle([unread])).toBe('read');
+    expect(keepsSelection('read')).toBe(true);
+    expect(keepsSelection('unread')).toBe(true);
+    expect(keepsSelection('archive')).toBe(false);
   });
 
   it('summarises the outcome in one line', () => {

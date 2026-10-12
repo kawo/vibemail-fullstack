@@ -70,7 +70,7 @@ Primary endpoints:
 
 ### Selection
 
-Several messages can be marked unread, archived, trashed or restored at once. The contract has no batch endpoint (CONTRACT.md §1 out of scope), so a bulk action sends one `PATCH /api/v1/messages/{id}` per message, one at a time, as archiving a conversation does (§2).
+Several messages can be marked unread or read, archived, trashed or restored at once. The contract has no batch endpoint (CONTRACT.md §1 out of scope), so a bulk action sends one `PATCH /api/v1/messages/{id}` per message, one at a time, as archiving a conversation does (§2).
 
 - **Checkbox.** Each inbox and search row leads with a checkbox. With a pointer it shows when the row is hovered or focused, and on every row while anything is selected. On touch screens its column appears only while selecting.
 - **Selecting.**
@@ -81,18 +81,18 @@ Several messages can be marked unread, archived, trashed or restored at once. Th
   - While anything is selected, tapping a row or pressing Enter toggles it instead of opening it, and swipe-to-archive is off.
   - Selected rows take the active label's tint over selected glass.
 - **Selection bar.** While anything is selected, a glass-3 bar replaces the list header (or the result count in search) and sticks under the search bar. It shows the select-all checkbox (mixed when some are selected), "{n} selected", the actions and a close `x`.
-  - **Mark unread** (`dot` icon) applies to the selected read messages: `{ addLabelIds: ['UNREAD'] }`.
+  - **Mark unread / Mark read** is one toggle, like the thread header's. While any selected message is read it reads **Mark unread** (`ring` icon) and sends `{ addLabelIds: ['UNREAD'] }` for the read ones. Once every selected message is unread it reads **Mark read** (the accent `dot`, pressed) and calls `POST /api/v1/messages/{id}/read` for each. Both keep the selection, so clicking again undoes it.
   - **Archive** applies to those whose `status` is `inbox`: `{ removeLabelIds: ['INBOX'] }`.
   - **Trash** (in `danger-text`) applies to those not in the trash: `{ addLabelIds: ['TRASH'] }`. It is hidden when every selected message is trashed.
   - **Restore** (`inbox` icon) applies to those in the trash: `{ removeLabelIds: ['TRASH'] }`. It is shown only when a selected message is trashed.
   - An action with nothing to apply to is disabled. When the list pane is too narrow for their words (under 490px with three actions, under 590px with four), the actions show as icons, each keeping its name as its label and tooltip, so none runs under the close `x`.
-- **Running.** Choosing an action clears the selection and dims every affected row at once; each row is replaced by its returned `message` as it completes. Marking unread shows rows unread straight away.
+- **Running.** Archive, Trash and Restore clear the selection; every affected row dims at once, and each row is replaced by its returned `message` as it completes. Marking unread or read shows the rows' new state straight away.
 - **Result.** One toast sums it up: "3 messages archived", or "2 of 3 messages archived. Couldn't update the rest." Archive, trash and restore offer Undo for 5 seconds, which sends the inverse change for the messages that succeeded.
 - **Errors.**
   - `MESSAGE_NOT_FOUND` drops that message from the cache, and the toast says "The rest no longer exist."
   - `GMAIL_RATE_LIMITED` stops the rest: "Gmail is busy, try again in {n}s. 2 of 5 messages archived."
   - `UNAUTHENTICATED`, `GMAIL_NOT_CONNECTED` and `GMAIL_TOKEN_REVOKED` stop the rest and follow the shared rules.
-- **Clearing.** The close `x`, Escape (unless the compose drawer is open), choosing a label, and changing or ending a search clear the selection.
+- **Clearing.** The close `x`, Escape (unless the compose drawer is open), choosing a label, changing or ending a search, and Archive, Trash or Restore clear the selection.
 
 ### Loading state
 

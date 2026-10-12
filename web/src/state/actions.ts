@@ -85,7 +85,7 @@ export async function move(message: MessageDTO, kind: Move, options: { undo?: bo
   return result !== null;
 }
 
-const BULK: Record<BulkKind, { change: UpdateLabelsRequest; undo: UpdateLabelsRequest | null }> = {
+const BULK: Record<Exclude<BulkKind, 'read'>, { change: UpdateLabelsRequest; undo: UpdateLabelsRequest | null }> = {
   unread: { change: { addLabelIds: ['UNREAD'] }, undo: null },
   archive: MOVES.archive,
   trash: MOVES.trash,
@@ -106,11 +106,13 @@ export async function bulk(kind: BulkKind, messages: readonly MessageDTO[]): Pro
   if (targets.length === 0) {
     return;
   }
-  const { change, undo } = BULK[kind];
+  const undo = kind === 'read' ? null : BULK[kind].undo;
+  // Marking read goes through `POST /api/v1/messages/{id}/read`; everything else is a label PATCH.
+  const apply = (m: MessageDTO) => (kind === 'read' ? tryMarkRead(m) : tryChangeLabels(m.gmailId, BULK[kind].change));
   for (const m of targets) {
     store.setPending(m.gmailId, true);
-    if (kind === 'unread') {
-      store.setOverride(m.gmailId, { isRead: false });
+    if (kind === 'unread' || kind === 'read') {
+      store.setOverride(m.gmailId, { isRead: kind === 'read' });
     }
   }
   const done: string[] = [];
@@ -122,7 +124,7 @@ export async function bulk(kind: BulkKind, messages: readonly MessageDTO[]): Pro
       store.setOverride(m.gmailId, null);
       continue;
     }
-    const result = await tryChangeLabels(m.gmailId, change);
+    const result = await apply(m);
     if (!(result instanceof ApiError)) {
       done.push(m.gmailId);
     } else if (STOPS.has(result.code)) {
@@ -160,6 +162,21 @@ export async function bulk(kind: BulkKind, messages: readonly MessageDTO[]): Pro
         }
       : {}),
   });
+}
+
+/** `markRead` that hands the error back instead of reporting it (bulk actions sum them up). */
+async function tryMarkRead(message: MessageDTO): Promise<MessageDTO | ApiError> {
+  store.setPending(message.gmailId, true);
+  try {
+    const { message: updated } = await api.markRead(message.gmailId);
+    store.upsert(updated);
+    return updated;
+  } catch (error) {
+    store.setOverride(message.gmailId, null);
+    return asApiError(error);
+  } finally {
+    store.setPending(message.gmailId, false);
+  }
 }
 
 /** Marks a message read through `POST /api/v1/messages/{id}/read`; true when it succeeded. */
