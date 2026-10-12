@@ -1,5 +1,6 @@
 import { ApiError, api } from '../api/client';
 import type { MessageDTO, UpdateLabelsRequest } from '../api/types';
+import { type BulkKind, bulkSummary, bulkTargets } from '../lib/selection';
 import { asApiError, store } from './store';
 
 /**
@@ -31,6 +32,16 @@ function reportFailure(error: ApiError, gmailId: string): void {
 
 /** Sends a label change, keeping the row pending until the server's `message` replaces it. */
 export async function changeLabels(gmailId: string, change: UpdateLabelsRequest): Promise<MessageDTO | null> {
+  const result = await tryChangeLabels(gmailId, change);
+  if (result instanceof ApiError) {
+    reportFailure(result, gmailId);
+    return null;
+  }
+  return result;
+}
+
+/** `changeLabels` that hands the error back instead of reporting it (bulk actions sum them up). */
+async function tryChangeLabels(gmailId: string, change: UpdateLabelsRequest): Promise<MessageDTO | ApiError> {
   store.setPending(gmailId, true);
   try {
     const { message } = await api.updateLabels(gmailId, change);
@@ -38,8 +49,7 @@ export async function changeLabels(gmailId: string, change: UpdateLabelsRequest)
     return message;
   } catch (error) {
     store.setOverride(gmailId, null);
-    reportFailure(asApiError(error), gmailId);
-    return null;
+    return asApiError(error);
   } finally {
     store.setPending(gmailId, false);
   }
@@ -73,6 +83,83 @@ export async function move(message: MessageDTO, kind: Move, options: { undo?: bo
     store.toast(done, { ttl: 5000, action: { label: 'Undo', run: () => void changeLabels(message.gmailId, undo) } });
   }
   return result !== null;
+}
+
+const BULK: Record<BulkKind, { change: UpdateLabelsRequest; undo: UpdateLabelsRequest | null }> = {
+  unread: { change: { addLabelIds: ['UNREAD'] }, undo: null },
+  archive: MOVES.archive,
+  trash: MOVES.trash,
+  restore: MOVES.restore,
+};
+
+/** Errors after which the rest of a bulk action would fail the same way. */
+const STOPS: ReadonlySet<string> = new Set(['UNAUTHENTICATED', 'GMAIL_NOT_CONNECTED', 'GMAIL_TOKEN_REVOKED', 'GMAIL_RATE_LIMITED']);
+
+/**
+ * A bulk action over selected messages (DESIGN_SPEC.md §1 Selection): one `PATCH` per message,
+ * one at a time, since the contract has no batch endpoint. Every affected row dims at once and
+ * comes back from the server's `message`. A sign-in, reconnect or rate-limit error stops the rest.
+ * One toast sums it up, with an Undo that sends the inverse change for those that succeeded.
+ */
+export async function bulk(kind: BulkKind, messages: readonly MessageDTO[]): Promise<void> {
+  const targets = bulkTargets(kind, messages);
+  if (targets.length === 0) {
+    return;
+  }
+  const { change, undo } = BULK[kind];
+  for (const m of targets) {
+    store.setPending(m.gmailId, true);
+    if (kind === 'unread') {
+      store.setOverride(m.gmailId, { isRead: false });
+    }
+  }
+  const done: string[] = [];
+  let stop: ApiError | null = null;
+  let missing = 0;
+  for (const m of targets) {
+    if (stop) {
+      store.setPending(m.gmailId, false);
+      store.setOverride(m.gmailId, null);
+      continue;
+    }
+    const result = await tryChangeLabels(m.gmailId, change);
+    if (!(result instanceof ApiError)) {
+      done.push(m.gmailId);
+    } else if (STOPS.has(result.code)) {
+      stop = result;
+    } else if (result.code === 'MESSAGE_NOT_FOUND') {
+      store.remove(m.gmailId);
+      missing += 1;
+    }
+  }
+  if (stop?.code === 'GMAIL_RATE_LIMITED') {
+    store.toast(`Gmail is busy, try again in ${stop.retryAfterSeconds ?? 30}s. ${bulkSummary(kind, done.length, targets.length)}`);
+    return;
+  }
+  if (stop) {
+    return; // The shared rules show the sign-in screen or reconnect panel.
+  }
+  const text =
+    done.length === targets.length
+      ? bulkSummary(kind, done.length, targets.length)
+      : `${bulkSummary(kind, done.length, targets.length)}. ${missing === targets.length - done.length ? 'The rest no longer exist.' : 'Couldn’t update the rest.'}`;
+  const inverse = undo;
+  store.toast(text, {
+    ttl: 5000,
+    ...(inverse && done.length > 0
+      ? {
+          action: {
+            label: 'Undo',
+            run: () =>
+              void (async () => {
+                for (const id of done) {
+                  await changeLabels(id, inverse);
+                }
+              })(),
+          },
+        }
+      : {}),
+  });
 }
 
 /** Marks a message read through `POST /api/v1/messages/{id}/read`; true when it succeeded. */

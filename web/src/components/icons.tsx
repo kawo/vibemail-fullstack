@@ -20,6 +20,9 @@ const ICONS = {
   // Five points; filled when starred, outlined when not.
   star: { d: 'M8 2.1 9.62 6.38 14.18 6.59 10.62 9.45 11.82 13.86 8 11.35 4.18 13.86 5.38 9.45 1.82 6.59 6.38 6.38Z', filled: true },
   'star-outline': { d: 'M8 2.1 9.62 6.38 14.18 6.59 10.62 9.45 11.82 13.86 8 11.35 4.18 13.86 5.38 9.45 1.82 6.59 6.38 6.38Z' },
+  // A tick and a dash: a selected and a partly selected checkbox.
+  check: { d: 'M4 8.25 6.75 11 12 5' },
+  'check-mixed': { d: 'M4.5 8h7' },
   // A circular arrow, clockwise.
   refresh: { d: 'M13 8a5 5 0 1 1-1.5-3.55 M11.75 1.75v3h-3' },
   // Three bars: opens the sidebar on a phone.

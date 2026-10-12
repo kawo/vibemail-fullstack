@@ -1,11 +1,15 @@
 import type { MessageDTO } from '../../api/types';
 import { MessageRow } from '../inbox/MessageRow';
+import { SelectBox } from '../inbox/SelectBox';
+import { SelectionBar } from '../inbox/SelectionBar';
+import { useListSelection } from '../inbox/useListSelection';
 import { Panel } from '../ui';
 
 /**
  * Search results (DESIGN_SPEC.md §5): inbox rows with the query terms highlighted and a status
  * badge for archived, sent, trashed and spam results; or the centred no-results state. The
- * paging rows at the end follow the inbox's.
+ * paging rows at the end follow the inbox's. Results can be selected like inbox rows; the
+ * selection bar then takes the result count's place.
  */
 export function SearchResultList({
   results,
@@ -22,6 +26,7 @@ export function SearchResultList({
   moreError: boolean;
   onRetryMore: () => void;
 }) {
+  const selection = useListSelection(results);
   if (results.length === 0) {
     return (
       <Panel empty title="No messages match your search.">
@@ -31,12 +36,31 @@ export function SearchResultList({
   }
   return (
     <>
-      <p className="result-count" aria-live="polite">
-        {results.length} {results.length === 1 ? 'result' : 'results'}
-      </p>
-      <div className="list">
+      {selection.selecting ? (
+        <SelectionBar
+          selected={selection.selectedListed}
+          listed={results.length}
+          onSelectAll={selection.selectAll}
+          onClear={selection.clearSelection}
+        />
+      ) : (
+        <div className="result-count">
+          <SelectBox state="none" label="Select all" onToggle={() => selection.selectAll(true)} />
+          <p aria-live="polite">
+            {results.length} {results.length === 1 ? 'result' : 'results'}
+          </p>
+        </div>
+      )}
+      <div className={selection.selecting ? 'list selecting' : 'list'}>
         {results.map((message) => (
-          <MessageRow key={message.gmailId} message={message} pending={pending.has(message.gmailId)} terms={terms} showStatus />
+          <MessageRow
+            key={message.gmailId}
+            message={message}
+            pending={pending.has(message.gmailId)}
+            terms={terms}
+            showStatus
+            selection={{ order: selection.order, selecting: selection.selecting }}
+          />
         ))}
       </div>
       {loadingMore && (

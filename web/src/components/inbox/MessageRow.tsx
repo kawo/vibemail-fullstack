@@ -3,10 +3,14 @@ import type { MessageDTO } from '../../api/types';
 import { formatSize, displayName, highlight, relativeTime } from '../../lib/format';
 import { markReadInBackground, markUnread, move, toggleStar } from '../../state/actions';
 import { navigate, threadIdOf, usePath } from '../../router';
+import { useInboxUi } from '../../state/inboxUi';
 import { Icon } from '../icons';
 import { Glyph } from '../ui';
+import { SelectBox } from './SelectBox';
 
 const SWIPE_ARCHIVE_PX = 90;
+const LONG_PRESS_MS = 450;
+const LONG_PRESS_SLOP_PX = 8;
 
 function Highlighted({ text, terms }: { text: string; terms: readonly string[] }) {
   return (
@@ -19,21 +23,41 @@ function Highlighted({ text, terms }: { text: string; terms: readonly string[] }
 /**
  * One inbox or search row (DESIGN_SPEC.md §1, §5). Every field shown is a `MessageDTO` field;
  * `status` is only read (for badges and the Restore action).
+ *
+ * With `selection`, the row has a checkbox on its leading edge (§1 Selection): Shift extends from
+ * the last one toggled, Ctrl/⌘-click and Space toggle, and a long press selects on touch screens.
+ * While anything is selected, a click or Enter toggles the row instead of opening it, and swipe
+ * is off.
  */
 export function MessageRow({
   message,
   pending,
   terms = [],
   showStatus = false,
+  selection,
 }: {
   message: MessageDTO;
   pending: boolean;
   terms?: readonly string[];
   showStatus?: boolean;
+  /** The list's order (for Shift ranges), and whether anything in it is selected. */
+  selection?: { order: readonly string[]; selecting: boolean };
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
+  const press = useRef<number | null>(null);
+  const pressed = useRef(false);
+  const { selected: selectedIds, toggleSelected } = useInboxUi();
+  const checked = selection !== undefined && selectedIds.has(message.gmailId);
+  const selecting = selection?.selecting ?? false;
+  const toggle = (range: boolean) => selection && toggleSelected(message.gmailId, { range, order: selection.order });
+  const cancelPress = () => {
+    if (press.current !== null) {
+      window.clearTimeout(press.current);
+      press.current = null;
+    }
+  };
 
   const open = () => {
     markReadInBackground(message);
@@ -45,20 +69,58 @@ export function MessageRow({
 
   return (
     <article
-      className={`row${message.isRead ? '' : ' unread'}${selected ? ' selected' : ''}${pending ? ' pending' : ''}`}
+      className={`row${message.isRead ? '' : ' unread'}${selected ? ' selected' : ''}${checked ? ' checked' : ''}${pending ? ' pending' : ''}`}
       aria-current={selected ? 'true' : undefined}
       style={dx ? { transform: `translateX(${dx}px)` } : undefined}
-      onClick={() => !menuOpen && open()}
+      onClick={(e) => {
+        if (pressed.current) {
+          pressed.current = false; // The long press already selected it.
+          return;
+        }
+        if (menuOpen) {
+          return;
+        }
+        if (selection && (selecting || e.shiftKey || e.ctrlKey || e.metaKey)) {
+          toggle(e.shiftKey);
+          return;
+        }
+        open();
+      }}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) {
+          return;
+        }
         if (e.key === 'Enter') {
-          open();
+          if (selection && selecting) {
+            toggle(e.shiftKey);
+          } else {
+            open();
+          }
+        } else if (e.key === ' ' && selection) {
+          e.preventDefault();
+          toggle(e.shiftKey);
         }
       }}
       tabIndex={0}
       aria-label={`${displayName(message.fromAddress)}: ${message.subject ?? '(no subject)'}`}
+      onContextMenu={(e) => {
+        // A long press selects; the browser's own long-press menu would cover it.
+        if (pressed.current || press.current !== null) {
+          e.preventDefault();
+        }
+      }}
       onTouchStart={(e) => {
         const touch = e.touches[0];
         start.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+        pressed.current = false;
+        if (selection && !pending) {
+          press.current = window.setTimeout(() => {
+            press.current = null;
+            pressed.current = true;
+            setDx(0);
+            toggle(false);
+          }, LONG_PRESS_MS);
+        }
       }}
       onTouchMove={(e) => {
         const touch = e.touches[0];
@@ -66,18 +128,35 @@ export function MessageRow({
           return;
         }
         const moveX = touch.clientX - start.current.x;
-        if (Math.abs(moveX) > Math.abs(touch.clientY - start.current.y)) {
+        const moveY = touch.clientY - start.current.y;
+        if (Math.hypot(moveX, moveY) > LONG_PRESS_SLOP_PX) {
+          cancelPress();
+        }
+        if (!selecting && !pressed.current && Math.abs(moveX) > Math.abs(moveY)) {
           setDx(Math.min(0, moveX));
         }
       }}
       onTouchEnd={() => {
-        if (dx <= -SWIPE_ARCHIVE_PX && !inTrash && message.status !== 'archived') {
+        cancelPress();
+        if (!selecting && dx <= -SWIPE_ARCHIVE_PX && !inTrash && message.status !== 'archived') {
           void move(message, 'archive');
         }
         setDx(0);
         start.current = null;
       }}
+      onTouchCancel={() => {
+        cancelPress();
+        setDx(0);
+      }}
     >
+      {selection && (
+        <SelectBox
+          className="row-select"
+          state={checked ? 'all' : 'none'}
+          label={`Select message from ${displayName(message.fromAddress)}`}
+          onToggle={toggle}
+        />
+      )}
       <button
         type="button"
         className={`icon-btn star ${message.isStarred ? 'on' : 'off'}`}

@@ -27,6 +27,7 @@ export function MessageList({
   onRefresh,
   onLoadMore,
   onLookFurther,
+  selection,
 }: {
   inbox: InboxState;
   loadedCount: number;
@@ -40,6 +41,7 @@ export function MessageList({
   onRefresh: () => void;
   onLoadMore: () => void;
   onLookFurther: () => void;
+  selection: { order: readonly string[]; selecting: boolean };
 }) {
   const [pull, setPull] = useState(0);
   const pullStart = useRef<number | null>(null);
@@ -83,9 +85,9 @@ export function MessageList({
     }
   } else {
     body = (
-      <div className="list">
+      <div className={selection.selecting ? 'list selecting' : 'list'}>
         {visible.map((message) => (
-          <MessageRow key={message.gmailId} message={message} pending={pending.has(message.gmailId)} />
+          <MessageRow key={message.gmailId} message={message} pending={pending.has(message.gmailId)} selection={selection} />
         ))}
       </div>
     );

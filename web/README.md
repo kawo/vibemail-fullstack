@@ -46,7 +46,7 @@ With `npm run dev` running, `/gallery.html` shows the compose drawer's states an
 | Spec | Code |
 |---|---|
 | Shared rules (auth refresh, reconnect, retry) | `src/api/client.ts`, `src/App.tsx` |
-| §1 Inbox, §4 label sidebar | `src/components/inbox/` (`InboxView`, `SearchBar`, `MessageList`, `MessageRow`, `ComposeButton`), `src/components/sidebar/` (`Sidebar`, `LabelNav`), `src/state/inboxUi.tsx` |
+| §1 Inbox, Selection, §4 label sidebar | `src/components/inbox/` (`InboxView`, `SearchBar`, `MessageList`, `MessageRow`, `ComposeButton`, `SelectBox`, `SelectionBar`, `useListSelection`), `src/lib/selection.ts`, `bulk` in `src/state/actions.ts`, `src/components/sidebar/` (`Sidebar`, `LabelNav`), `src/state/inboxUi.tsx` |
 | §2 Thread view | `src/components/thread/` (`ThreadView`, `ThreadHeader`, `MessageCard`, `Avatar`, `ThreadSkeleton`), `HtmlBody.tsx`, `src/lib/thread.ts` |
 | §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` (state, autosave, send), `src/compose/sheet/` (`ComposeSheet`, `ComposeHeader`, `RecipientField`, `BodyField`) |
 | §4 Label filter rules | `src/lib/filters.ts` |

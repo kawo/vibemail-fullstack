@@ -7,6 +7,9 @@ import { loadInbox, loadMore, useStore } from '../../state/store';
 import { DraftsView } from '../drafts';
 import { SearchView } from '../search';
 import { MessageList } from './MessageList';
+import { SelectBox } from './SelectBox';
+import { SelectionBar } from './SelectionBar';
+import { useListSelection } from './useListSelection';
 import { MIN_QUERY, SearchBar } from './SearchBar';
 import { useNearEnd } from './useNearEnd';
 
@@ -36,6 +39,7 @@ export function InboxView({ covered }: { covered: boolean }) {
   const showingDrafts = chip.kind === 'drafts';
   const { loaded } = useLoadedMessages();
   const visible = useMemo(() => loaded.filter((m) => matchesChip(m, chip)), [loaded, chip]);
+  const selection = useListSelection(visible);
   const filling = !showingDrafts && inbox.state === 'ready' && shouldFill(visible.length, fillPages, inbox.nextCursor) && !inbox.moreError;
   const lookFurther = !showingDrafts && inbox.state === 'ready' && fillPages >= 5 && visible.length < 25 && inbox.nextCursor !== null;
 
@@ -86,17 +90,28 @@ export function InboxView({ covered }: { covered: boolean }) {
         <DraftsView />
       ) : (
         <>
-          <div className="status-line">
-            <h1 className="list-title">{chipLabel(chip)}</h1>
-            <p className="synced" aria-live="polite">
-              {inbox.state === 'ready' &&
-                (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
-            </p>
-          </div>
+          {selection.selecting ? (
+            <SelectionBar
+              selected={selection.selectedListed}
+              listed={visible.length}
+              onSelectAll={selection.selectAll}
+              onClear={selection.clearSelection}
+            />
+          ) : (
+            <div className="status-line">
+              {visible.length > 0 && <SelectBox state="none" label="Select all" onToggle={() => selection.selectAll(true)} />}
+              <h1 className="list-title">{chipLabel(chip)}</h1>
+              <p className="synced" aria-live="polite">
+                {inbox.state === 'ready' &&
+                  (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
+              </p>
+            </div>
+          )}
           <MessageList
             inbox={inbox}
             loadedCount={loaded.length}
             visible={visible}
+            selection={{ order: selection.order, selecting: selection.selecting }}
             chip={chip}
             pending={s.pending}
             filling={filling}

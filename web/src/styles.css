@@ -198,6 +198,12 @@ button {
   display: none !important;
 }
 
+/* The list pane is a size container, so its header can adapt to the pane's own width (the
+   selection bar's actions turn to icons when it is narrow). */
+.list-pane {
+  container: list / inline-size;
+}
+
 /* The inbox stays mounted under an open thread, keeping its paging. */
 .list-pane.covered {
   display: none;
@@ -713,7 +719,7 @@ button {
 }
 
 .synced {
-  margin: 0;
+  margin: 0 0 0 auto;
   color: var(--mute);
   font-size: 12px;
   line-height: 16px;
@@ -722,8 +728,7 @@ button {
 
 .status-line {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-md) var(--space-sm);
   border-bottom: 1px solid var(--hairline-strong);
@@ -937,6 +942,18 @@ button {
   column-gap: var(--space-sm);
   min-height: var(--size-row-min);
   padding: var(--space-sm) var(--space-sm) var(--space-sm) 6px;
+}
+
+/* A selectable row (inbox and search) leads with its checkbox column. */
+.row:has(> .row-select) {
+  grid-template-columns: 20px 28px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'select star from meta'
+    'select star line line';
+  padding-left: var(--space-xs);
+}
+
+.row {
   background: var(--surface-soft);
   border-bottom: 1px solid var(--hairline);
   /* No backdrop-filter here: a row sits straight on the backdrop, where blur shows nothing, and a
@@ -1011,6 +1028,156 @@ button {
   justify-content: center;
   height: 20px;
   color: var(--mute);
+}
+
+/* ---------- Selection (DESIGN_SPEC §1 Selection) ---------- */
+/* A 14px box with a 1.5px mute edge, like the drawn icons; selected, it fills with the accent
+   (a mark, never text) and shows an ink tick. Its button is the row height for an easy target. */
+.select-box {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.select-box .box {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--mute);
+  border-radius: 3px;
+  background: var(--surface-soft);
+}
+
+.select-box:hover .box {
+  border-color: var(--ink);
+}
+
+.select-box.on .box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.select-box .box .icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+.row .row-select {
+  grid-area: select;
+  align-self: start;
+}
+
+/* At rest the row's box hides until the row is hovered or focused, like the outline star; it
+   stays while anything in the list is selected. Touch screens show it only while selecting
+   (a long press starts), and the column folds away otherwise. */
+.row .row-select:not(.on) {
+  opacity: 0;
+}
+
+.row:hover .row-select,
+.row:focus-within .row-select,
+.list.selecting .row .row-select {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .list:not(.selecting) .row:has(> .row-select) {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'star from meta'
+      'star line line';
+    padding-left: 6px;
+  }
+
+  .list:not(.selecting) .row .row-select {
+    display: none;
+  }
+}
+
+/* A selected row: the active label's tint over selected glass. */
+.row.checked,
+.row.checked:hover,
+.row.unread.checked {
+  background: linear-gradient(var(--chip-active-tint), var(--chip-active-tint)), var(--surface-selected);
+}
+
+/* The header's select-all box lines up with the rows' boxes. */
+.status-line .select-box {
+  margin-left: calc(var(--space-xs) - var(--space-md));
+}
+
+/* Replaces the list header while selecting: glass 3, stuck under the search bar. */
+.selection-bar {
+  position: sticky;
+  top: calc(var(--size-header) + env(safe-area-inset-top) + 1px);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 0 var(--space-sm) 0 var(--space-xs);
+  background: var(--surface-dark-elevated);
+  border-bottom: 1px solid var(--hairline-strong);
+  box-shadow: var(--glass-highlight), var(--glass-3);
+  -webkit-backdrop-filter: var(--blur-3);
+  backdrop-filter: var(--blur-3);
+}
+
+.selection-count {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.bulk-btn {
+  color: var(--body);
+}
+
+.bulk-btn.danger {
+  color: var(--danger-text);
+}
+
+.bulk-btn:disabled .icon {
+  opacity: 0.5;
+}
+
+/* Narrow lists (phones, and the list pane beside a thread) show the actions as icons; each keeps
+   its name as its accessible label and tooltip. */
+@container list (max-width: 420px) {
+  .bulk-btn .bulk-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .bulk-btn {
+    min-width: var(--size-control-sm);
+    justify-content: center;
+    padding: 0;
+  }
 }
 
 /* Row hierarchy, strongest first: sender (14px, full white, medium), subject (13px, softer
@@ -1316,11 +1483,17 @@ mark {
 }
 
 .result-count {
-  margin: 0;
-  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xs);
   color: var(--mute);
   font-size: 12px;
   line-height: 16px;
+}
+
+.result-count p {
+  margin: 0;
 }
 
 /* Refining a query: earlier results stay, dimmed, until the new ones arrive (§5). */
