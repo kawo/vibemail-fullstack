@@ -1,14 +1,14 @@
 # VibeMail Engine — Contract
 
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
-> **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts. They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
+> **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
 > Stack: Vercel Functions (Node.js runtime, `api/` directory, no framework) · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
 
 ## 1. Purpose & scope
 
-The VibeMail Engine is the backend that connects a user's Gmail account, mirrors their mail into Supabase, and exposes user-facing endpoints (Google sign-in, message list, send, mark as read and, from v1.1, label updates, thread view, search and drafts) plus two machine-facing endpoints (the Gmail Pub/Sub webhook and the watch-renewal cron job).
+The VibeMail Engine is the backend that connects a user's Gmail account, mirrors their mail into Supabase, and exposes user-facing endpoints (Google sign-in, message list, send, mark as read and, from v1.1, label updates, thread view, search, drafts and the draft list) plus two machine-facing endpoints (the Gmail Pub/Sub webhook and the watch-renewal cron job).
 
 **In scope (v1)**
 
@@ -24,7 +24,8 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
   - a derived message `status` (§3.4);
   - changing one message's labels: star, unstar, mark unread, archive, move to trash, restore (§4.7);
   - a thread view and full-text search, both read from the DB only (§4.8, §4.9);
-  - creating, updating and deleting Gmail drafts (§4.10–§4.12).
+  - creating, updating and deleting Gmail drafts (§4.10–§4.12);
+  - listing the user's Gmail drafts, read from Gmail on request (§4.13).
   - Filtering by label happens in the client, on `status`, `isStarred` and `labelIds`; there is no filter endpoint.
 
 **Out of scope (v1)**
@@ -33,7 +34,7 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
 - Server-side label/unread filters.
 - Scheduled jobs other than watch renewal. In particular, there is no scheduled or request-triggered sync: Gmail is read only at connect time and on push. The thread view and search read the DB only, so they see only stored messages.
 - Permanent delete, emptying the trash, and batch operations.
-- Listing or fetching drafts, and sending a draft by `draftId`.
+- Fetching a single draft, and sending a draft by `draftId`.
 - Multiple Gmail accounts per user.
 
 ---
@@ -74,6 +75,7 @@ The project is complete when **every** item below is true and verifiable.
     - `GET /api/v1/threads/{threadId}` and `GET /api/v1/messages/search` make zero Gmail API calls (asserted as in criterion 6).
     - `PATCH /api/v1/messages/{id}` routes `TRASH` changes to `messages.trash` / `messages.untrash` and every other change to `messages.modify`.
     - The draft endpoints never accept a `draftId` in a request body; it comes only from the path.
+    - `GET /api/v1/drafts` skips a draft that Gmail returns 404 for between `drafts.list` and `drafts.get`, its `nextCursor` round-trips Gmail's `nextPageToken`, and it makes no DB query beyond loading `users`.
 
 ---
 
@@ -269,7 +271,7 @@ interface DraftDTO {
 }
 ```
 
-**`draftId` is server-managed.** Gmail assigns it on create (§4.10). A client never supplies one in a request body; it only echoes one it received from §4.10 back in the path of §4.11 and §4.12.
+**`draftId` is server-managed.** Gmail assigns it on create (§4.10). A client never supplies one in a request body; it only echoes one it received from §4.10, §4.11 or §4.13 back in the path of §4.11 and §4.12.
 
 **Draft request body** (§4.10, §4.11):
 
@@ -862,6 +864,55 @@ Discards a draft. Function file: `api/v1/drafts/[draftId].ts`.
 | `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
 | `VALIDATION_FAILED` | 400 | Malformed `draftId`. |
 | `MESSAGE_NOT_FOUND` | 404 | Gmail does not know the `draftId` (`details: { draftId }`). A client that is cleaning up may treat this as already done. |
+| `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
+| `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
+| `INTERNAL` | 500 | An unexpected exception. |
+
+---
+
+### 4.13 List drafts — `GET /api/v1/drafts` (*Added in v1.1*)
+
+Lists the user's Gmail drafts. Drafts are not stored in the DB (§3.7), so this endpoint reads Gmail on every call. It is called when the user opens Drafts or asks to refresh them, and once when the client starts; never on a timer. Function file: `api/v1/drafts/index.ts` (beside §4.10's `POST`).
+
+**Request**
+
+```ts
+// Query string
+interface ListDraftsQuery {
+  limit?: number;   // integer 1..50, default 25
+  cursor?: string;  // opaque; value of a previous response's nextCursor
+}
+```
+
+**Behavior**
+
+1. Authenticate, then load the user's credentials.
+2. Call `users.drafts.list({ userId: 'me', maxResults: limit, pageToken? })`, with `pageToken` decoded from `cursor`.
+3. For each listed draft, call `users.drafts.get({ userId: 'me', id, format: 'full' })`, at most 10 at a time, and map it to a `DraftDTO` (§3.7):
+   - `to` from the `To` header (empty when absent), `subject` from `Subject` (`""` when absent), `body` from the first `text/plain` part as in §5.1 `body_plain` (`""` when none);
+   - `updatedAt` is the draft message's `internalDate`, which Gmail sets on every save.
+4. A draft that returns 404 on `get` (deleted in between) is skipped; the page may then be shorter than `limit`.
+5. Drafts keep Gmail's order (newest first).
+
+**Cursor:** `base64url(JSON.stringify({ p: nextPageToken }))`. Unlike the DB-backed lists (§4.2), it wraps Gmail's page token rather than a keyset, because drafts are read from Gmail. Clients treat it as opaque.
+
+**Response — `200 OK`**
+
+```ts
+interface ListDraftsResponse {
+  drafts: DraftDTO[];          // length <= limit
+  nextCursor: string | null;   // null when Gmail returns no nextPageToken
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row or refresh token. |
+| `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
+| `VALIDATION_FAILED` | 400 | `limit` not an integer in 1..50, `cursor` fails to decode, or Gmail rejects the page token as invalid (`details: { cursor }`). |
 | `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
 | `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
 | `INTERNAL` | 500 | An unexpected exception. |

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../api/client';
-import type { MessageDTO } from '../api/types';
-import { Icon } from '../components/ui';
+import type { DraftDTO, MessageDTO } from '../api/types';
 import {
   type ComposeFields,
   type FieldIssue,
   isBlank,
-  isValidAddress,
   issuesFromDetails,
+  joinQuote,
   replyFields,
+  splitQuote,
   splitRecipients,
   validateForSend,
 } from '../lib/compose';
@@ -21,9 +21,13 @@ import {
   saveDraftSnapshot,
   saveUnsent,
 } from '../lib/draftStore';
-import { relativeTime } from '../lib/format';
+import { replyThreadId } from '../lib/drafts';
+import { draftGone, draftSaved } from '../state/drafts';
 import { asApiError, store } from '../state/store';
 import type { OpenRequest } from './ComposeContext';
+import { drawerGeometry } from './geometry';
+import { ComposeSheet } from './sheet/ComposeSheet';
+import type { ComposeNoticeView, ComposeView, SaveStatus } from './sheet/types';
 
 /** DESIGN_SPEC.md §3: the three named states. */
 type Mode = 'default' | 'reply' | 'restored';
@@ -33,7 +37,6 @@ type SendProblem = null | { kind: 'banner'; text: string; retry: boolean } | { k
 
 const AUTOSAVE_MS = 2000;
 const RETRY_SAVE_MS = 10_000;
-const MAX_HEIGHT_RATIO = 0.58;
 
 interface Initial {
   mode: Mode;
@@ -41,10 +44,18 @@ interface Initial {
   draftId: string | null;
   savedAt: string | null;
   confirm: Confirm;
+  /** Opened from Drafts rather than restored from this device's snapshot. */
+  opened: boolean;
 }
+
+/** Whether VibeMail has stored a message in this thread (a listed draft is then a reply). */
+const hasStoredThread = (threadId: string): boolean => store.inbox.ids.some((id) => store.get(id)?.threadId === threadId);
 
 function initialState(request: OpenRequest): Initial {
   const snapshot = loadDraftSnapshot();
+  if (request.draft) {
+    return { ...openedDraft(request.draft, snapshot), confirm: null, opened: true };
+  }
   if (request.reply) {
     if (snapshot) {
       // "Replace your saved draft?" is asked before entering reply mode.
@@ -54,15 +65,27 @@ function initialState(request: OpenRequest): Initial {
         draftId: snapshot.draftId,
         savedAt: snapshot.updatedAt,
         confirm: { kind: 'replace', reply: request.reply, snapshot },
+        opened: false,
       };
     }
-    return { mode: 'reply', fields: replyFields(request.reply), draftId: null, savedAt: null, confirm: null };
+    return { mode: 'reply', fields: replyFields(request.reply), draftId: null, savedAt: null, confirm: null, opened: false };
   }
   if (snapshot) {
-    return { mode: 'restored', fields: fromDraft(snapshot), draftId: snapshot.draftId, savedAt: snapshot.updatedAt, confirm: null };
+    return { mode: 'restored', fields: fromDraft(snapshot), draftId: snapshot.draftId, savedAt: snapshot.updatedAt, confirm: null, opened: false };
   }
   const unsent = loadUnsent();
-  return { mode: 'default', fields: unsent ?? { to: [], subject: '', body: '' }, draftId: null, savedAt: null, confirm: null };
+  return { mode: 'default', fields: unsent ?? { to: [], subject: '', body: '' }, draftId: null, savedAt: null, confirm: null, opened: false };
+}
+
+/** A draft from the list, in the restored state: its `draftId` is kept for the next save. */
+function openedDraft(draft: DraftDTO, snapshot: DraftSnapshot | null): Omit<Initial, 'confirm' | 'opened'> {
+  const threadId = replyThreadId(draft, snapshot, hasStoredThread);
+  return {
+    mode: 'restored',
+    fields: { to: draft.to, subject: draft.subject, body: draft.body, ...(threadId ? { threadId } : {}) },
+    draftId: draft.draftId,
+    savedAt: draft.updatedAt,
+  };
 }
 
 /** Gmail gives every draft a `threadId`; only one the user replied into makes it a reply. */
@@ -70,7 +93,10 @@ function fromDraft(draft: DraftSnapshot): ComposeFields {
   return { to: draft.to, subject: draft.subject, body: draft.body, ...(draft.requestedThreadId ? { threadId: draft.requestedThreadId } : {}) };
 }
 
-/** Keeps the drawer above the software keyboard and within 58% of the viewport height. */
+/**
+ * Keeps the drawer on top of the software keyboard and within 58% of the screen height
+ * (`drawerGeometry`), and keeps the focused field in view when the space changes.
+ */
 function useKeyboardAwareHeight(ref: React.RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const node = ref.current;
@@ -78,19 +104,27 @@ function useKeyboardAwareHeight(ref: React.RefObject<HTMLDivElement | null>) {
     if (!node) {
       return;
     }
-    // The viewport height before any keyboard opened: the drawer's cap is 58% of it.
+    // The no-keyboard height, per width: rotating the phone starts a new measurement.
+    let width = window.innerWidth;
     let fullHeight = window.innerHeight;
     const update = () => {
-      fullHeight = Math.max(fullHeight, window.innerHeight);
-      const cap = Math.round(fullHeight * MAX_HEIGHT_RATIO);
-      if (!viewport) {
-        node.style.setProperty('--drawer-height', `${cap}px`);
-        return;
+      if (window.innerWidth !== width) {
+        width = window.innerWidth;
+        fullHeight = window.innerHeight;
       }
-      const keyboard = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      const above = viewport.height - 8;
-      node.style.setProperty('--kb-offset', `${keyboard}px`);
-      node.style.setProperty('--drawer-height', `${Math.max(160, Math.min(cap, above))}px`);
+      fullHeight = Math.max(fullHeight, window.innerHeight);
+      const { height, keyboardOffset } = drawerGeometry({
+        fullHeight,
+        innerHeight: window.innerHeight,
+        visualHeight: viewport ? viewport.height : null,
+        visualOffsetTop: viewport ? viewport.offsetTop : 0,
+      });
+      node.style.setProperty('--kb-offset', `${keyboardOffset}px`);
+      node.style.setProperty('--drawer-height', `${height}px`);
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && node.contains(focused)) {
+        focused.scrollIntoView({ block: 'nearest' });
+      }
     };
     update();
     viewport?.addEventListener('resize', update);
@@ -109,7 +143,10 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
   const [chips, setChips] = useState<string[]>(init.fields.to);
   const [pendingTo, setPendingTo] = useState('');
   const [subject, setSubject] = useState(init.fields.subject);
-  const [body, setBody] = useState(init.fields.body);
+  // The reply quote is shown as its own block and joined back under the text on save and send.
+  const [initBody] = useState(() => splitQuote(init.fields.body));
+  const [text, setText] = useState(initBody.text);
+  const [quote, setQuote] = useState<string | null>(initBody.quote);
   const [threadId, setThreadId] = useState<string | undefined>(init.fields.threadId);
   const [draftId, setDraftId] = useState<string | null>(init.draftId);
   const [savedAt, setSavedAt] = useState<string | null>(init.savedAt);
@@ -126,7 +163,7 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
 
   const drawer = useRef<HTMLDivElement | null>(null);
   const toInput = useRef<HTMLInputElement | null>(null);
-  const bodyInput = useRef<HTMLTextAreaElement | null>(null);
+  const textInput = useRef<HTMLTextAreaElement | null>(null);
   const draftIdRef = useRef(draftId);
   draftIdRef.current = draftId;
   const saving = useRef(false);
@@ -140,10 +177,10 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
     (): ComposeFields => ({
       to: [...chips, ...splitRecipients(pendingTo)],
       subject,
-      body,
+      body: joinQuote(text, quote),
       ...(threadId ? { threadId } : {}),
     }),
-    [chips, pendingTo, subject, body, threadId],
+    [chips, pendingTo, subject, text, quote, threadId],
   );
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
@@ -152,10 +189,13 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
   useEffect(() => {
     document.body.classList.add('scroll-locked');
     if (init.mode === 'reply') {
-      bodyInput.current?.focus();
-      bodyInput.current?.setSelectionRange(0, 0);
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(0, 0);
     } else if (init.mode === 'restored') {
-      bodyInput.current?.focus();
+      // Picking a draft up again: the caret goes to the end of what was written.
+      const field = textInput.current;
+      field?.focus();
+      field?.setSelectionRange(field.value.length, field.value.length);
     } else {
       toInput.current?.focus();
     }
@@ -195,12 +235,14 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
       setDraftId(draft.draftId);
       setSavedAt(draft.updatedAt);
       saveDraftSnapshot(draft, current.threadId);
+      draftSaved(draft);
       clearUnsent();
       setSaveState('saved');
     } catch (error) {
       const apiError = asApiError(error);
       if (apiError.code === 'MESSAGE_NOT_FOUND' && draftIdRef.current) {
         // Deleted elsewhere: the next save creates a new draft.
+        draftGone(draftIdRef.current);
         draftIdRef.current = null;
         setDraftId(null);
         clearDraftSnapshot();
@@ -251,8 +293,11 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
   const deleteDraftQuietly = async (id: string, reportFailure: boolean) => {
     try {
       await api.deleteDraft(id);
+      draftGone(id);
     } catch (error) {
-      if (reportFailure && asApiError(error).code !== 'MESSAGE_NOT_FOUND') {
+      if (asApiError(error).code === 'MESSAGE_NOT_FOUND') {
+        draftGone(id); // Already deleted elsewhere.
+      } else if (reportFailure) {
         store.toast('Couldn’t delete the draft in Gmail');
       }
     }
@@ -368,31 +413,100 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
       setSaveState('idle');
       setChips(reply.to);
       setSubject(reply.subject);
-      setBody(reply.body);
+      const split = splitQuote(reply.body);
+      setText(split.text);
+      setQuote(split.quote);
       setThreadId(reply.threadId);
       setShowRestoredBanner(false);
       window.setTimeout(() => {
-        bodyInput.current?.focus();
-        bodyInput.current?.setSelectionRange(0, 0);
+        textInput.current?.focus();
+        textInput.current?.setSelectionRange(0, 0);
       });
     }
     setConfirm(null);
   };
 
   const blockedFor = Math.max(0, Math.ceil((blockedUntil - now) / 1000));
-  const canSend = !sending && blockedFor === 0 && fields().to.length > 0 && confirm === null;
-  const issueFor = (field: FieldIssue['field']) => issues.filter((i) => i.field === field).map((i) => i.message).join(' ');
-  const saveLabel = { idle: '', saving: 'Saving…', saved: 'Saved', unsaved: 'Not saved', stopped: 'Not saved' }[saveState];
+  const current = fields();
+  const canSend = !sending && blockedFor === 0 && current.to.length > 0 && confirm === null;
+  const issueFor = (field: FieldIssue['field']) => issues.filter((i) => i.field === field).map((i) => i.message).join(' ') || undefined;
+
+  const saveStatus: SaveStatus | null = {
+    idle: null,
+    saving: { text: 'Saving…', tone: 'quiet' },
+    saved: { text: 'Saved', tone: 'ok' },
+    unsaved: { text: 'Not saved', tone: 'warn' },
+    stopped: { text: 'Not saved', tone: 'warn' },
+  }[saveState] as SaveStatus | null;
+
+  // One line under the header, most urgent first: a confirmation, a send problem, a rate limit.
+  let notice: ComposeNoticeView | null = null;
+  if (confirm?.kind === 'discard') {
+    notice = { tone: 'info', text: 'Discard draft?', actions: [{ label: 'Discard', onClick: discard, primary: true }, { label: 'Keep', onClick: () => setConfirm(null) }] };
+  } else if (confirm?.kind === 'replace') {
+    notice = {
+      tone: 'info',
+      text: 'Replace your saved draft?',
+      actions: [
+        { label: 'Replace', onClick: () => void resolveConfirmReplace(true), primary: true },
+        { label: 'Keep draft', onClick: () => void resolveConfirmReplace(false) },
+      ],
+    };
+  } else if (problem?.kind === 'banner') {
+    notice = { tone: 'error', text: problem.text, actions: problem.retry ? [{ label: 'Retry', onClick: () => void send(), primary: true }] : [] };
+  } else if (problem?.kind === 'thread-missing') {
+    const then = problem.then;
+    notice = {
+      tone: 'error',
+      text: 'This conversation no longer exists. Send as a new message?',
+      actions: [
+        {
+          label: then === 'send' ? 'Send as new' : 'Make it a new message',
+          primary: true,
+          onClick: () => {
+            const next = { ...fields() };
+            delete next.threadId;
+            setThreadId(undefined);
+            setProblem(null);
+            if (then === 'send') {
+              void send(next);
+            } else {
+              edited();
+            }
+          },
+        },
+      ],
+    };
+  } else if (blockedFor > 0) {
+    notice = { tone: 'error', text: `Gmail is busy. You can send again in ${blockedFor}s.`, actions: [] };
+  }
+
+  const view: ComposeView = {
+    mode: init.mode,
+    replying: threadId !== undefined,
+    recipients: chips,
+    pendingTo,
+    subject,
+    text,
+    quote,
+    saveStatus,
+    restoredAt: showRestoredBanner && confirm === null ? savedAt : null,
+    ...(init.opened ? { restoredLabel: 'Draft' } : {}),
+    issues: { to: issueFor('to'), subject: issueFor('subject'), body: issueFor('body') ?? issueFor('threadId') },
+    notice,
+    sending,
+    waitSeconds: blockedFor,
+    canSend,
+    canSaveDraft: !sending && !isBlank(current) && saveState !== 'saving',
+    expanded,
+  };
 
   return (
     <>
       <div className="scrim" onClick={close} aria-hidden="true" />
-      <div
-        ref={drawer}
-        className={`glass-raised drawer${expanded ? ' expanded' : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={threadId ? 'Reply' : 'New message'}
+      <ComposeSheet
+        view={view}
+        refs={{ sheet: drawer, toInput, textInput }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canSend) {
             e.preventDefault();
@@ -401,168 +515,21 @@ export function ComposeDrawer({ request, onClose }: { request: OpenRequest; onCl
             close();
           }
         }}
-      >
-        <div className="handle" aria-hidden="true" />
-        <div className="drawer-head">
-          <button type="button" className="icon-btn" aria-label="Close" onClick={close} disabled={sending}>
-            <Icon name="close" />
-          </button>
-          <div className="drawer-title">
-            {threadId ? 'Reply' : 'New message'}
-            <span className="save-state" aria-live="polite">
-              {saveLabel}
-            </span>
-          </div>
-          <button type="button" className="icon-btn expand-btn" aria-label={expanded ? 'Collapse' : 'Expand'} onClick={() => setExpanded((v) => !v)}>
-            <Icon name="expand" size={18} />
-          </button>
-          <button type="button" className="text-btn" onClick={() => setConfirm({ kind: 'discard' })} disabled={sending}>
-            Discard
-          </button>
-          <button type="button" className="primary-btn" disabled={!canSend} onClick={() => void send()}>
-            {sending ? <span className="spinner" /> : <Icon name="send" size={16} />}
-            {blockedFor > 0 ? `Wait ${blockedFor}s` : 'Send'}
-          </button>
-        </div>
-
-        {confirm?.kind === 'discard' && (
-          <div className="notice">
-            Discard draft?
-            <button type="button" className="text-btn" onClick={discard}>
-              Discard
-            </button>
-            <button type="button" className="text-btn" onClick={() => setConfirm(null)}>
-              Keep
-            </button>
-          </div>
-        )}
-        {confirm?.kind === 'replace' && (
-          <div className="notice">
-            Replace your saved draft?
-            <button type="button" className="text-btn" onClick={() => void resolveConfirmReplace(true)}>
-              Replace
-            </button>
-            <button type="button" className="text-btn" onClick={() => void resolveConfirmReplace(false)}>
-              Keep draft
-            </button>
-          </div>
-        )}
-        {showRestoredBanner && savedAt && confirm === null && (
-          <div className="notice">
-            Draft restored · saved {relativeTime(savedAt)}
-            <button type="button" className="text-btn" onClick={() => setConfirm({ kind: 'discard' })}>
-              Discard
-            </button>
-          </div>
-        )}
-        {problem?.kind === 'banner' && (
-          <div className="notice error" role="alert">
-            {problem.text}
-            {problem.retry && (
-              <button type="button" className="text-btn" onClick={() => void send()}>
-                Retry
-              </button>
-            )}
-          </div>
-        )}
-        {problem?.kind === 'thread-missing' && (
-          <div className="notice error" role="alert">
-            This conversation no longer exists. Send as a new message?
-            <button
-              type="button"
-              className="text-btn"
-              onClick={() => {
-                const next = { ...fields() };
-                delete next.threadId;
-                setThreadId(undefined);
-                setProblem(null);
-                if (problem.then === 'send') {
-                  void send(next);
-                } else {
-                  edited();
-                }
-              }}
-            >
-              {problem.then === 'send' ? 'Send as new' : 'Make it a new message'}
-            </button>
-          </div>
-        )}
-
-        {threadId && (
-          <div className="notice">
-            <span className="pill">
-              Replying in conversation
-              <button type="button" aria-label="Stop replying in this conversation" onClick={() => (setThreadId(undefined), edited())}>
-                ×
-              </button>
-            </span>
-          </div>
-        )}
-
-        <div className="field">
-          <label htmlFor="compose-to">To</label>
-          <div className="recipients">
-            {chips.map((address, i) => (
-              <span key={`${address}-${i}`} className={`recipient${isValidAddress(address) ? '' : ' invalid'}`}>
-                {address}
-                <button type="button" aria-label={`Remove ${address}`} onClick={() => (setChips((prev) => prev.filter((_, j) => j !== i)), edited())}>
-                  ×
-                </button>
-              </span>
-            ))}
-            <input
-              id="compose-to"
-              ref={toInput}
-              type="text"
-              inputMode="email"
-              autoComplete="email"
-              value={pendingTo}
-              readOnly={sending}
-              onChange={(e) => {
-                if (/[,;]$/.test(e.target.value)) {
-                  setPendingTo(e.target.value);
-                  window.setTimeout(commitPending);
-                } else {
-                  setPendingTo(e.target.value);
-                }
-                edited();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  commitPending();
-                } else if (e.key === 'Backspace' && pendingTo === '' && chips.length > 0) {
-                  setChips((prev) => prev.slice(0, -1));
-                  edited();
-                }
-              }}
-              onBlur={commitPending}
-            />
-          </div>
-        </div>
-        {issueFor('to') && <div className="field-error">{issueFor('to')}</div>}
-        <div className="field">
-          <label htmlFor="compose-subject">Subject</label>
-          <input
-            id="compose-subject"
-            value={subject}
-            maxLength={998}
-            readOnly={sending}
-            onChange={(e) => (setSubject(e.target.value.replace(/[\r\n]/g, ' ')), edited())}
-          />
-        </div>
-        {issueFor('subject') && <div className="field-error">{issueFor('subject')}</div>}
-        <textarea
-          ref={bodyInput}
-          className="body-field"
-          aria-label="Message"
-          value={body}
-          readOnly={sending}
-          onChange={(e) => (setBody(e.target.value), edited())}
-          onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'nearest' })}
-        />
-        {(issueFor('body') || issueFor('threadId')) && <div className="field-error">{issueFor('body') || issueFor('threadId')}</div>}
-      </div>
+        actions={{
+          onPendingToChange: (value) => (setPendingTo(value), edited()),
+          onCommitTo: commitPending,
+          onRemoveRecipient: (index) => (setChips((prev) => prev.filter((_, j) => j !== index)), edited()),
+          onRemoveLastRecipient: () => (setChips((prev) => prev.slice(0, -1)), edited()),
+          onSubjectChange: (value) => (setSubject(value), edited()),
+          onTextChange: (value) => (setText(value), edited()),
+          onLeaveConversation: () => (setThreadId(undefined), edited()),
+          onDiscardDraft: () => setConfirm({ kind: 'discard' }),
+          onSaveDraft: () => void save(true),
+          onSend: () => void send(),
+          onClose: close,
+          onToggleExpand: () => setExpanded((v) => !v),
+        }}
+      />
     </>
   );
 }

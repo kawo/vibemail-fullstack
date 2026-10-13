@@ -39,17 +39,21 @@ npm run typecheck
 npm run build
 ```
 
+With `npm run dev` running, `/gallery.html` shows the compose drawer's states and error states side by side, rendered from the same `ComposeSheet` with sample content. It is not part of the app build.
+
 ## How it maps to the spec
 
 | Spec | Code |
 |---|---|
 | Shared rules (auth refresh, reconnect, retry) | `src/api/client.ts`, `src/App.tsx` |
-| §1 Inbox and its label filter bar | `src/components/Inbox.tsx`, `MessageRow.tsx` |
-| §2 Thread view | `src/components/ThreadView.tsx`, `HtmlBody.tsx` |
-| §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` |
-| §4 Label filter | `src/lib/filters.ts` |
-| §5 Search | `src/components/SearchResults.tsx` |
-| Visual direction | `src/styles.css` |
+| §1 Inbox, Selection, §4 label sidebar | `src/components/inbox/` (`InboxView`, `SearchBar`, `MessageList`, `MessageRow`, `ComposeButton`, `SelectBox`, `SelectionBar`, `useListSelection`), `src/lib/selection.ts`, `bulk` in `src/state/actions.ts`, `src/components/sidebar/` (`Sidebar`, `LabelNav`), `src/state/inboxUi.tsx` |
+| §2 Thread view | `src/components/thread/` (`ThreadView`, `ThreadHeader`, `MessageCard`, `Avatar`, `ThreadSkeleton`), `HtmlBody.tsx`, `src/lib/thread.ts` |
+| §3 Compose drawer (default, reply, draft-restored; mobile keyboard) | `src/compose/ComposeDrawer.tsx` (state, autosave, send), `src/compose/sheet/` (`ComposeSheet`, `ComposeHeader`, `RecipientField`, `BodyField`) |
+| §4 Label filter rules | `src/lib/filters.ts` |
+| §4 Drafts (`GET /api/v1/drafts`) | `src/components/drafts/` (`DraftsView`, `DraftRow`), `src/state/drafts.ts`, `src/lib/drafts.ts` |
+| §5 Search | `src/components/search/` (`SearchView`, `SearchResultList`); the field is `inbox/SearchBar` |
+| §4 Account and Settings (theme, text size) | `src/components/sidebar/` (`AccountFooter`, `SettingsPanel`, `useAccountEmail`), `src/lib/preferences.ts`, `src/state/preferences.ts` |
+| Visual direction (VibeMail Glass design system tokens) | `src/styles.css` | (dark and light themes, `--text-scale`)
 
 Two contract invariants are enforced by the request types in `src/api/types.ts`:
 - **`status`:** no request type has a `status` field; it changes only through labels.

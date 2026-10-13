@@ -2,18 +2,20 @@ import type { MessageDTO } from '../api/types';
 
 /**
  * Label filter (DESIGN_SPEC.md §4): client-side only, on `status`, `isStarred` and `labelIds`.
- * `status` is read, never computed or set here.
+ * `status` is read, never computed or set here. Drafts is a label in the sidebar but not a filter:
+ * drafts are never stored messages (CONTRACT.md §3.5), so it shows the draft list (§4.13) instead.
  */
 
 export type Chip =
   | { kind: 'all' }
   | { kind: 'starred' }
+  | { kind: 'drafts' }
   | { kind: 'archive' }
   | { kind: 'trash' }
   | { kind: 'label'; labelId: string };
 
-/** The four fixed chips, always rendered first and in this order. */
-export const FIXED_CHIPS: readonly Chip[] = [{ kind: 'all' }, { kind: 'starred' }, { kind: 'archive' }, { kind: 'trash' }];
+/** The five fixed labels, always rendered first and in this order. */
+export const FIXED_CHIPS: readonly Chip[] = [{ kind: 'all' }, { kind: 'starred' }, { kind: 'drafts' }, { kind: 'archive' }, { kind: 'trash' }];
 
 const notTrashOrSpam = (m: MessageDTO) => m.status !== 'trash' && m.status !== 'spam';
 
@@ -23,6 +25,8 @@ export function matchesChip(message: MessageDTO, chip: Chip): boolean {
       return notTrashOrSpam(message);
     case 'starred':
       return message.isStarred && notTrashOrSpam(message);
+    case 'drafts':
+      return false; // Drafts are never stored messages; Drafts shows the draft list.
     case 'archive':
       return message.status === 'archived';
     case 'trash':
@@ -45,6 +49,43 @@ export function customLabelIds(messages: readonly MessageDTO[]): string[] {
   return [...ids].sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * How many new (unread) loaded messages each label matches, keyed by `chipKey`. Counts cover only
+ * mail VibeMail has synced and loaded (the contract has no count endpoint), the same set the label
+ * filter works on. Drafts has no unread state; the sidebar counts its drafts separately.
+ */
+export function chipCounts(messages: readonly MessageDTO[], chips: readonly Chip[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const chip of chips) {
+    let n = 0;
+    for (const message of messages) {
+      if (!message.isRead && matchesChip(message, chip)) {
+        n += 1;
+      }
+    }
+    counts.set(chipKey(chip), n);
+  }
+  return counts;
+}
+
+/** The sidebar shows a count on every label that has one; a zero shows nothing. */
+export function showsCount(count: number): boolean {
+  return count > 0;
+}
+
+/** The count's accessible wording: Drafts counts drafts; every other label counts new messages. */
+export function countNoun(chip: Chip, count: number): string {
+  if (chip.kind === 'drafts') {
+    return count === 1 ? 'draft' : 'drafts';
+  }
+  return count === 1 ? 'new message' : 'new messages';
+}
+
+/** The number as shown: `999+` past 999, and a `+` while more of an open-ended list is unread. */
+export function countText(count: number, more = false): string {
+  return count > 999 ? '999+' : more ? `${count}+` : String(count);
+}
+
 export function chipKey(chip: Chip): string {
   return chip.kind === 'label' ? `label:${chip.labelId}` : chip.kind;
 }
@@ -55,6 +96,8 @@ export function chipLabel(chip: Chip): string {
       return 'All';
     case 'starred':
       return 'Starred';
+    case 'drafts':
+      return 'Drafts';
     case 'archive':
       return 'Archive';
     case 'trash':
@@ -71,8 +114,10 @@ export function emptyStateText(chip: Chip): string | null {
       return null; // The inbox empty state applies.
     case 'starred':
       return 'No starred messages.';
+    case 'drafts':
+      return 'No drafts.';
     case 'archive':
-      return 'Nothing archived yet.';
+      return 'Nothing in Archive.';
     case 'trash':
       return 'Trash is empty.';
     case 'label':

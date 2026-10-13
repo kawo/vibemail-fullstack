@@ -13,7 +13,7 @@ export function HtmlBody({ html }: { html: string }) {
   const clean = useMemo(() => DOMPurify.sanitize(html, { WHOLE_DOCUMENT: false, FORBID_TAGS: ['style'] }), [html]);
   const hasRemoteImages = useMemo(() => /<img[^>]+src=["']?https?:/i.test(clean), [clean]);
   const csp = `default-src 'none'; style-src 'unsafe-inline'; img-src data: cid:${allowImages ? ' https: http:' : ''}; font-src data:`;
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>body{margin:12px;font:15px/1.5 system-ui,sans-serif;color:#111;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style></head><body>${clean}</body></html>`;
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>body{margin:12px;font:14px/22px system-ui,sans-serif;color:#111;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style></head><body>${clean}</body></html>`;
 
   // Measured on the frame's own load event, which can fire before any effect could subscribe.
   const measure = () => {

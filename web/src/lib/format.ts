@@ -8,6 +8,18 @@ export function displayName(address: string): string {
   return address.trim();
 }
 
+/** The bare address of `Name <addr>`, or the raw value when it has no angle brackets. */
+export function emailAddress(address: string): string {
+  const match = /<([^<>]+)>\s*$/.exec(address);
+  return (match?.[1] ?? address).trim();
+}
+
+/** The address to show in brackets beside a name: none when the name already is the address. */
+export function addressBesideName(address: string, name: string): string | null {
+  const mail = emailAddress(address);
+  return mail && mail.toLowerCase() !== name.trim().toLowerCase() ? mail : null;
+}
+
 export function relativeTime(iso: string, now: Date = new Date()): string {
   const then = new Date(iso);
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);

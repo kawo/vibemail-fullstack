@@ -1,10 +1,12 @@
 import { type ReactNode, createContext, useContext, useState } from 'react';
-import type { MessageDTO } from '../api/types';
+import type { DraftDTO, MessageDTO } from '../api/types';
 import { ComposeDrawer } from './ComposeDrawer';
 
 export interface OpenRequest {
   /** Present for reply mode (DESIGN_SPEC.md §3). */
   reply?: MessageDTO;
+  /** A draft opened from Drafts (CONTRACT.md §4.13): the drawer edits that draft. */
+  draft?: DraftDTO;
 }
 
 interface ComposeApi {

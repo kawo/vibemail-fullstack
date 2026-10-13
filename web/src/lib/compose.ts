@@ -93,3 +93,35 @@ export function splitRecipients(text: string): string[] {
     .map((part) => part.trim())
     .filter(Boolean);
 }
+
+export interface SplitBody {
+  /** What the user writes. */
+  text: string;
+  /** The "On …, … wrote:" attribution and its "> " lines, or null when there is none. */
+  quote: string | null;
+}
+
+const ATTRIBUTION = /^On .+ wrote:$/;
+
+/**
+ * Separates a reply body into the user's text and the trailing quote, so the drawer can show the
+ * quote as its own block below the body. The quote is the last "On …, … wrote:" line followed
+ * only by "> " lines (or blank ones). A body without one comes back whole as `text`.
+ */
+export function splitQuote(body: string): SplitBody {
+  const lines = body.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (ATTRIBUTION.test(lines[i] ?? '') && lines.slice(i + 1).every((l) => l.startsWith('>') || l.trim() === '')) {
+      return { text: lines.slice(0, i).join('\n').replace(/\s+$/, ''), quote: lines.slice(i).join('\n').replace(/\s+$/, '') };
+    }
+  }
+  return { text: body, quote: null };
+}
+
+/** The body that is sent and saved: the user's text, a blank line, then the quote. */
+export function joinQuote(text: string, quote: string | null): string {
+  if (!quote) {
+    return text;
+  }
+  return `${text.replace(/\s+$/, '')}\n\n${quote}`;
+}

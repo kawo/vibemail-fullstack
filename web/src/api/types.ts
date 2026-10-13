@@ -74,6 +74,12 @@ export interface ListMessagesResponse {
   lastSyncedAt: string | null;
 }
 
+/** §4.13 `GET /api/v1/drafts`: read from Gmail, newest first. */
+export interface ListDraftsResponse {
+  drafts: DraftDTO[];
+  nextCursor: string | null;
+}
+
 export interface SearchMessagesResponse {
   messages: MessageDTO[];
   nextCursor: string | null;

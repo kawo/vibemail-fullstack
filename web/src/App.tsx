@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { onApiSignal } from './api/client';
 import { auth as authClient, completeSignIn, currentSession, startSignIn } from './auth/session';
-import { Inbox } from './components/Inbox';
-import { ThreadView } from './components/ThreadView';
-import { Icon, Toasts } from './components/ui';
-import { ComposeProvider, useCompose } from './compose/ComposeContext';
+import { ComposeButton, InboxView } from './components/inbox';
+import { Sidebar } from './components/sidebar';
+import { InboxUiProvider, useInboxUi } from './state/inboxUi';
+import { ThreadView } from './components/thread';
+import { Glyph, Toasts } from './components/ui';
+import { ComposeProvider } from './compose/ComposeContext';
 import { navigate, threadIdOf, usePath } from './router';
 import { store } from './state/store';
 
@@ -36,13 +38,10 @@ function SignIn({ error }: { error: string | null }) {
   return (
     <div className="signin">
       <div className="glass-raised panel">
-        <div className="orb" aria-hidden="true" />
-        <h1>
-          Vibe<span style={{ color: 'var(--accent)' }}>Mail</span>
-        </h1>
+        <h1>VibeMail</h1>
         <p>Your Gmail, liberated into a mailbox you own.</p>
         {error && (
-          <p role="alert" style={{ color: 'var(--danger)' }}>
+          <p role="alert" className="error">
             {error}
           </p>
         )}
@@ -58,13 +57,13 @@ function ReconnectPanel({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="reconnect-title">
       <div className="glass-raised panel">
-        <div className="orb" aria-hidden="true" />
+        <Glyph name="alert" className="mark" />
         <h2 id="reconnect-title">Reconnect Gmail</h2>
         <p>VibeMail lost access to your Gmail. Sign in with Google again to pick up where you left off.</p>
         <button type="button" className="primary-btn" onClick={startSignIn}>
           Reconnect Gmail
         </button>
-        <button type="button" className="text-btn" onClick={onDismiss}>
+        <button type="button" className="secondary-btn" onClick={onDismiss}>
           Not now
         </button>
       </div>
@@ -72,15 +71,24 @@ function ReconnectPanel({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-function ComposeButton() {
-  const compose = useCompose();
-  if (compose.isOpen) {
-    return null;
-  }
+/** The thread, or (side by side only) a quiet prompt when none is open. */
+function ReadingPane({ threadId }: { threadId: string | null }) {
+  const pane = useRef<HTMLElement | null>(null);
+  const { chip, searchActive } = useInboxUi();
+  // Each thread opens at its top; the pane scrolls on its own when side by side.
+  useEffect(() => {
+    pane.current?.scrollTo({ top: 0 });
+  }, [threadId]);
   return (
-    <button type="button" className="primary-btn fab" onClick={() => compose.open()}>
-      <Icon name="compose" size={18} /> Compose
-    </button>
+    <section ref={pane} className={`reading-pane${threadId === null ? ' empty-pane' : ''}`} aria-label="Conversation">
+      {threadId !== null ? (
+        <ThreadView key={threadId} threadId={threadId} />
+      ) : (
+        <p className="reading-empty">
+          {chip.kind === 'drafts' && !searchActive ? 'Open a draft to keep writing it.' : 'Select a conversation to read it here.'}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -106,7 +114,7 @@ export function App() {
         if (result.initialSync === 'failed') {
           store.toast('Your first sync didn’t finish. New mail will still arrive as it comes in.', { ttl: 8000 });
         }
-        navigate('/');
+        navigate('/', { animate: false });
         setAuth('signed-in');
         return;
       }
@@ -146,14 +154,22 @@ export function App() {
   const threadId = threadIdOf(path);
   return (
     <ComposeProvider>
-      <main className="app">
-        {/* The inbox stays mounted behind the thread view, keeping its chip and scroll position. */}
-        <Inbox hidden={threadId !== null} />
-        {threadId !== null && <ThreadView key={threadId} threadId={threadId} />}
-      </main>
-      <ComposeButton />
-      <Toasts />
-      {reconnect && <ReconnectPanel onDismiss={() => setReconnect(false)} />}
+      <InboxUiProvider>
+        <div className="shell">
+          <Sidebar />
+          <main className="app">
+            {/* From 1100px the open thread shows in the reading pane beside the list. Narrower,
+                it replaces the list; the inbox stays mounted underneath, so its paging survives
+                the round trip, and the router restores its scroll position. */}
+            <InboxView covered={threadId !== null} />
+            <ReadingPane threadId={threadId} />
+          </main>
+        </div>
+        {/* Phones only: the sidebar is hidden there, so Compose also floats bottom-right. */}
+        <ComposeButton />
+        <Toasts />
+        {reconnect && <ReconnectPanel onDismiss={() => setReconnect(false)} />}
+      </InboxUiProvider>
     </ComposeProvider>
   );
 }
