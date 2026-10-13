@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { signInMessage } from '@/lib/auth/callback';
-import { currentSession, startSignIn } from '@/lib/auth/session';
+import { AuthCard } from '@/app/components/auth/AuthCard';
+import { signInMessage } from '@/app/lib/auth/callback';
+import { currentSession, startSignIn } from '@/app/lib/auth/session';
 
 /**
  * Sign in (CONTRACT.md §4.1): the glass card and "Sign in with Google". The button is a

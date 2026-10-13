@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import { type ApiError, api, isAbort } from '@/services';
-import type { DraftDTO } from '@/services/types';
-import { appendDrafts, removeDraft, upsertDraft } from '@/lib/drafts';
+import { type ApiError, api, isAbort } from '@/app/services';
+import type { DraftDTO } from '@/app/services/types';
+import { appendDrafts, removeDraft, upsertDraft } from '@/app/lib/drafts';
 import { asApiError, store, type LoadState } from '@/state/store';
 
 /**

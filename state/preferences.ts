@@ -8,7 +8,7 @@ import {
   resolveTheme,
   saveTextSize,
   saveTheme,
-} from '@/lib/preferences';
+} from '@/app/lib/preferences';
 
 /**
  * The display preferences as live state: changing one re-applies it to <html> at once and saves

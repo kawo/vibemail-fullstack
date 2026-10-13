@@ -1,9 +1,9 @@
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { MessageDTO } from '@/services/types';
-import { type Chip, chipCounts, chipFromParam, chipKey, customLabelIds, FIXED_CHIPS, inboxQuery } from '@/lib/filters';
-import { toggleSelection } from '@/lib/selection';
-import { MIN_QUERY } from '@/components/inbox/SearchBar';
-import { INBOX_PATH, navigate, setInboxQuery, threadIdOf } from '@/lib/router';
+import type { MessageDTO } from '@/app/services/types';
+import { type Chip, chipCounts, chipFromParam, chipKey, customLabelIds, FIXED_CHIPS, inboxQuery } from '@/app/lib/filters';
+import { toggleSelection } from '@/app/lib/selection';
+import { MIN_QUERY } from '@/app/components/inbox/SearchBar';
+import { INBOX_PATH, navigate, setInboxQuery, threadIdOf } from '@/app/lib/router';
 import { useStore } from '@/state/store';
 
 /**

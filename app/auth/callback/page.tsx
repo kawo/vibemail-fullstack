@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { completeSignIn } from '@/lib/auth/session';
-import { INITIAL_SYNC_FAILED_KEY } from '@/components/auth/AuthGuard';
+import { AuthCard } from '@/app/components/auth/AuthCard';
+import { completeSignIn } from '@/app/lib/auth/session';
+import { INITIAL_SYNC_FAILED_KEY } from '@/app/components/auth/AuthGuard';
 
 /**
  * Where the engine's sign-in callback (api/v1/auth/google/callback.ts, CONTRACT.md §4.1b) sends

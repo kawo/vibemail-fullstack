@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "ES2022"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -15,24 +19,37 @@
     "jsx": "preserve",
     "incremental": true,
     "tsBuildInfoFile": ".next/cache/tsconfig.next.tsbuildinfo",
-    "types": ["node"],
-    "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./*"] }
+    "types": [
+      "node"
+    ],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
   },
   "include": [
     "next-env.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
-    "components/**/*.ts",
-    "components/**/*.tsx",
-    "lib/**/*.ts",
     "state/**/*.ts",
     "state/**/*.tsx",
-    "services/**/*.ts",
-    "styles/**/*.ts",
     "data/**/*.ts",
     "data/**/*.js",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "api", "src", "tests", "supabase", "web", "dist"]
+  "exclude": [
+    "node_modules",
+    "api",
+    "src",
+    "tests",
+    "supabase",
+    "web",
+    "dist"
+  ]
 }

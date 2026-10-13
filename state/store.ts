@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import { ApiError, api, isAbort } from '@/services';
-import type { MessageDTO } from '@/services/types';
+import { ApiError, api, isAbort } from '@/app/services';
+import type { MessageDTO } from '@/app/services/types';
 
 /**
  * One client-side cache of `MessageDTO`s keyed by `gmailId`, shared by every view

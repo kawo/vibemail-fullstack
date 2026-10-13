@@ -2,7 +2,8 @@ import type { NextConfig } from 'next';
 
 /**
  * The VibeMail Glass web client: a Next.js (App Router) app at the repo root, beside the engine.
- * Routes are in app/; components/, lib/, state/, services/, styles/ and data/ hold the rest.
+ * app/ holds the routes plus components/, lib/, services/ and styles/ (none of which has a page,
+ * so none is routable); state/ and data/ sit at the root.
  *
  * It talks to the engine (api/, Vercel functions) over CONTRACT.md §4 at NEXT_PUBLIC_API_URL, so
  * there are no rewrites or API routes here. Next type-checks with tsconfig.next.json; the root

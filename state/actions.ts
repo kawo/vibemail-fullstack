@@ -1,6 +1,6 @@
-import { ApiError, api } from '@/services';
-import type { MessageDTO, UpdateLabelsRequest } from '@/services/types';
-import { type BulkKind, bulkSummary, bulkTargets } from '@/lib/selection';
+import { ApiError, api } from '@/app/services';
+import type { MessageDTO, UpdateLabelsRequest } from '@/app/services/types';
+import { type BulkKind, bulkSummary, bulkTargets } from '@/app/lib/selection';
 import { asApiError, store } from '@/state/store';
 
 /**

@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { themeScript } from '@/lib/themeScript';
-import '@/styles/tokens.css';
-import '@/styles/glass.css';
-import '@/styles/app.css';
+import { themeScript } from '@/app/lib/themeScript';
+import '@/app/styles/tokens.css';
+import '@/app/styles/glass.css';
+import '@/app/styles/app.css';
 
 export const metadata: Metadata = {
   title: 'VibeMail Glass',

@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./', import.meta.url)) } },
   test: {
-    include: ['{lib,components,services,state}/**/*.test.ts'],
+    include: ['app/{lib,components,services}/**/*.test.ts', 'state/**/*.test.ts'],
     environment: 'node',
   },
 });
