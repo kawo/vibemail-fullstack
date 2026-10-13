@@ -1,0 +1,182 @@
+/*
+ * VibeMail Glass design tokens: the design system's tokens.css names and values (tokens.json →
+ * custom properties), dark by default, the light theme under [data-theme='light'], and the
+ * Settings › Text size scale. Every colour, glass level, blur, space and size the app uses is
+ * one of these; app.css and glass.css only ever read them.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Backdrop */
+  --canvas: #050810;
+  --backdrop-top: #070d24;
+  --backdrop-bottom: #10204a;
+  --backdrop-bloom: rgba(88, 86, 214, 0.18);
+  --surface-dark: #0a0f1e;
+
+  /* Glass ladder */
+  --surface-soft: rgba(255, 255, 255, 0.08);
+  --surface-card: rgba(255, 255, 255, 0.1);
+  --surface-dark-elevated: rgba(255, 255, 255, 0.12);
+  --surface-selected: rgba(255, 255, 255, 0.14);
+  --surface-raised: rgba(255, 255, 255, 0.16);
+  --scrim: rgba(5, 8, 16, 0.55);
+  --glass-tint: rgba(10, 15, 30, 0.72);
+  --star-off-opacity: 0.45;
+  --sheet-tint: rgba(10, 15, 30, 0.82);
+  --on-accent: #ffffff;
+  --hairline: rgba(255, 255, 255, 0.15);
+  --glass-edge: rgba(255, 255, 255, 0.17);
+  --hairline-strong: rgba(255, 255, 255, 0.2);
+  --selected-edge: rgba(255, 255, 255, 0.42);
+
+  /* Text */
+  --primary: #fdfcfc;
+  --on-primary: #201d1d;
+  --ink-deep: #dcd8d8;
+  --ink: #f8f7f7;
+  --charcoal: #e8e5e5;
+  --body: #d2d2d7;
+  --mute: #bdbbbb;
+  /* Row hierarchy: sender full white, snippet white at 58% (the lowest that keeps 4.5:1 on
+     every row glass over the bright end of the backdrop). */
+  --row-sender: #ffffff;
+  --row-snippet: rgba(255, 255, 255, 0.58);
+  --stone: #aeadb2;
+  --ash: #9a9898;
+  --on-dark: #fdfcfc;
+  --on-dark-mute: #9a9898;
+
+  /* Semantic */
+  --accent: #007aff;
+  --accent-hover: #0056b3;
+  --accent-active: #004085;
+  --chip-active-tint: rgba(0, 122, 255, 0.22);
+  --search-glow: rgba(0, 122, 255, 0.18);
+  --search-glow-outer: rgba(0, 122, 255, 0.45);
+  --warning: #ff9f0a;
+  /* Warning as words (Not saved); the same value on dark glass. */
+  --warning-text: #ff9f0a;
+  --highlight: rgba(255, 159, 10, 0.28);
+  --danger: #ff3b30;
+  --danger-text: #ffaca6;
+  --danger-hover: #d70015;
+  --success: #30d158;
+
+  /* Shadows and blur */
+  --glass-1: 0 2px 8px rgba(0, 0, 0, 0.24);
+  --glass-2: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --glass-3: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --glass-raised: 0 24px 64px rgba(2, 6, 23, 0.6);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --unread-glow: inset 2px 0 0 #007aff, -4px 0 12px -4px rgba(0, 122, 255, 0.6);
+  --shimmer: rgba(255, 255, 255, 0.07);
+  --blur-1: blur(20px);
+  --blur-2: blur(28px);
+  --blur-3: blur(40px);
+  --blur-raised: blur(48px);
+
+  /* Space, radius, size */
+  --space-xxs: 1px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+  --radius-none: 0px;
+  --radius-sm: 4px;
+  --radius-full: 9999px;
+  --size-header: 48px;
+  --size-row-min: 56px;
+  --size-control-sm: 28px;
+  --size-control: 36px;
+  --size-input: 40px;
+  --size-drawer: 560px;
+  --size-sidebar: 232px;
+  --size-sidebar-min: 184px;
+  --size-sidebar-max: 360px;
+  --size-avatar: 32px;
+  --size-avatar-sm: 24px;
+  --size-icon: 16px;
+  --size-list-pane: clamp(340px, 30vw, 440px);
+
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  --kb-offset: 0px;
+  /* Settings › Text size: every font size and line height is multiplied by this. */
+  --text-scale: 1;
+}
+
+/* ---------- Light theme (Settings › Appearance) ----------
+   The same glass over a pale blue-grey ground: white glass rises toward white, navy hairlines
+   and soft navy shadows, near-black text. The accent keeps its one value. Every text token keeps
+   4.5:1 on its grounds (stone 4.6:1 for punctuation, ash 3.5:1 for disabled text, as in dark);
+   the star keeps 3:1 as an icon, and words in warning use warning-text. */
+:root[data-theme='light'],
+[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #e9edf6;
+  --backdrop-top: #f4f6fb;
+  --backdrop-bottom: #d9e1f2;
+  --backdrop-bloom: rgba(88, 86, 214, 0.1);
+  --surface-dark: #ffffff;
+
+  --surface-soft: rgba(255, 255, 255, 0.45);
+  --surface-card: rgba(255, 255, 255, 0.6);
+  --surface-dark-elevated: rgba(255, 255, 255, 0.7);
+  --surface-selected: rgba(255, 255, 255, 0.8);
+  --surface-raised: rgba(255, 255, 255, 0.82);
+  --scrim: rgba(15, 23, 42, 0.22);
+  --glass-tint: rgba(245, 247, 252, 0.9);
+  --sheet-tint: rgba(245, 247, 252, 0.9);
+  --hairline: rgba(15, 23, 42, 0.1);
+  --glass-edge: rgba(15, 23, 42, 0.12);
+  --hairline-strong: rgba(15, 23, 42, 0.16);
+  --selected-edge: rgba(0, 86, 179, 0.45);
+
+  --primary: #1d1b1b;
+  --on-primary: #fdfcfc;
+  --ink-deep: #2b2d33;
+  --ink: #15171c;
+  --charcoal: #22252b;
+  --body: #3a3d45;
+  --mute: #565a64;
+  --row-sender: #0b0d12;
+  --row-snippet: rgba(11, 13, 18, 0.66);
+  --stone: #5f636c;
+  --ash: #72767e;
+  --on-dark: #fdfcfc;
+  --on-dark-mute: #72767e;
+
+  --chip-active-tint: rgba(0, 122, 255, 0.14);
+  --search-glow: rgba(0, 122, 255, 0.14);
+  --search-glow-outer: rgba(0, 122, 255, 0.3);
+  --warning: #b06500;
+  --warning-text: #8f5000;
+  --highlight: rgba(255, 159, 10, 0.32);
+  --danger-text: #c0150b;
+  --success: #12703a;
+
+  --glass-1: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --glass-2: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --glass-3: 0 16px 48px rgba(15, 23, 42, 0.1);
+  --glass-raised: 0 24px 64px rgba(15, 23, 42, 0.18);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --unread-glow: inset 2px 0 0 #007aff, -4px 0 12px -4px rgba(0, 122, 255, 0.35);
+  --shimmer: rgba(15, 23, 42, 0.05);
+}
+
+/* Settings › Text size (lib/preferences.ts TEXT_SCALE). */
+:root[data-text-size='small'] {
+  --text-scale: 0.9;
+}
+
+:root[data-text-size='large'] {
+  --text-scale: 1.12;
+}
+
+:root[data-text-size='larger'] {
+  --text-scale: 1.25;
+}
