@@ -62,7 +62,26 @@ tests/integration/   tests against a real dev/test Supabase project
 
 ## Frontend
 
-[`web/`](web/) holds **VibeMail Glass**, the Vite + React frontend that implements [`docs/DESIGN_SPEC.md`](docs/DESIGN_SPEC.md). It is a separate npm project with its own setup; see [`web/README.md`](web/README.md). Deploy it as its own Vercel project with `web` as the root directory, and set the engine's `FRONTEND_URL` to its origin.
+**VibeMail Glass**, the web client, is a Next.js 15 (App Router) + React 19 app at the repo root, beside the engine. It implements [`docs/DESIGN_SPEC.md`](docs/DESIGN_SPEC.md) and talks to the engine only over [`CONTRACT.md`](CONTRACT.md) §4.
+
+```
+app/                 routes: auth/, auth/callback/, (mail)/inbox, (mail)/thread/[threadId]
+  components/        UI: MessageRow (inbox, search, thread), ComposeDrawer (mode prop), sidebar, settings
+  lib/               pure logic and its Vitest tests
+  services/          data layer: DataSource, sampleSource (Phase 1), httpSource (Phase 2)
+  styles/            glass CSS and design-system tokens (dark, light, text scale)
+state/               client stores
+data/data.js         sample data for Phase 1 (kept intact)
+```
+
+```bash
+npm install
+npm run web:dev      # http://localhost:3001, sample data by default
+npm run web:test     # Vitest
+npm run web:build    # next build (type-checks with tsconfig.next.json)
+```
+
+Set `NEXT_PUBLIC_DATA_SOURCE=api` and the other `NEXT_PUBLIC_*` values in `.env` to use the engine instead of the sample data, and set the engine's `FRONTEND_URL` to the client's origin. Deployment is not set up yet; see the "Web client" section of [`CLAUDE.md`](CLAUDE.md).
 
 ## Getting started
 
