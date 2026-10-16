@@ -2,7 +2,7 @@
  * The inbox view, split by responsibility:
  *
  *   InboxView        label fill paging; label and search come from InboxUiProvider
- *   ├─ SearchBar      menu button (phones), search field, clear, refresh
+ *   ├─ SearchBar      menu button (phones), search field with the ⌘K / Ctrl K shortcut, clear, refresh
  *   ├─ list title     select-all box, the active label's name and the sync line
  *   ├─ SelectionBar   replaces the list title while selecting: count, bulk actions, clear
  *   ├─ MessageList    skeletons, errors, empty states, paging rows, pull to refresh
@@ -11,7 +11,7 @@
  *   └─ (SearchView, from components/search, replaces the filter bar and list while searching)
  *   ComposeButton     phones only: fixed bottom-right (Compose lives in the sidebar elsewhere)
  *
- * Labels and Compose are in components/sidebar.
+ * Labels (as chips) and Compose are in components/sidebar.
  */
 export { InboxView } from '@/app/components/inbox/InboxView';
 export { ComposeButton } from '@/app/components/inbox/ComposeButton';

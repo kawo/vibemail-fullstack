@@ -148,7 +148,7 @@ function ListLine({
         }
       }}
       tabIndex={0}
-      aria-label={`${displayName(message.fromAddress)}: ${message.subject ?? '(no subject)'}`}
+      aria-label={`${displayName(message.fromAddress)}: ${message.subject ?? '(no subject)'}${message.isRead ? '' : ', unread'}`}
       onContextMenu={(e) => {
         // A long press selects; the browser's own long-press menu would cover it.
         if (pressed.current || press.current !== null) {
@@ -227,6 +227,7 @@ function ListLine({
           </span>
         )}
         <time dateTime={message.internalDate}>{relativeTime(message.internalDate)}</time>
+        {!message.isRead && <span className="unread-dot" aria-hidden="true" />}
         <button
           type="button"
           className="icon-btn more"

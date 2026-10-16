@@ -10,7 +10,8 @@ import { LabelNav } from '@/app/components/sidebar/LabelNav';
 import { SidebarResizer } from '@/app/components/sidebar/SidebarResizer';
 
 /**
- * The left sidebar: product name, Compose, and the labels (DESIGN_SPEC.md §4).
+ * The left sidebar: product name, Compose, then the labels as chips, one per line: All, Starred,
+ * Archive, Trash, Drafts and the custom labels (DESIGN_SPEC.md §1 Label sidebar).
  *
  * From 768px it is always shown and stays put while the inbox and threads change beside it.
  * On a phone it is a panel that slides in from the left (opened from the header's menu button),

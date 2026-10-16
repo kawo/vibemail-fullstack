@@ -1,7 +1,10 @@
 import { type CSSProperties, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TEXT_SIZES, type TextSize, THEMES, type ThemePref } from '@/app/lib/preferences';
+import { signOut } from '@/app/lib/auth/session';
+import { Icon } from '@/app/components/icons';
 import { setTextSize, setTheme, usePreferences } from '@/state/preferences';
+import { store } from '@/state/store';
 
 const THEME_LABEL: Record<ThemePref, string> = { dark: 'Dark', light: 'Light', system: 'System' };
 const SIZE_LABEL: Record<TextSize, string> = { small: 'Small', default: 'Default', large: 'Large', larger: 'Larger' };
@@ -13,7 +16,7 @@ const GAP = 8;
 /**
  * The Settings panel (DESIGN_SPEC.md §4 Settings): raised glass opened from the sidebar's
  * Settings button, with Appearance (Dark, Light, System) and Text size (Small to Larger) as radio
- * groups. A change applies at once and is kept on the device. It opens above the button (beside
+ * groups, then Keyboard shortcuts (which opens the shortcuts list) and Sign out. A change applies at once and is kept on the device. It opens above the button (beside
  * it when the sidebar shows icons only), at the page's top level so the sidebar's scrolling glass
  * doesn't clip it. In the phone's sidebar panel (a modal dialog) it opens `inline` inside it
  * instead, so it stays within the dialog. Escape, a click outside, or the button again closes it; focus returns to the
@@ -25,6 +28,7 @@ export function SettingsPanel({
   beside,
   inline = false,
   onClose,
+  onShowShortcuts,
 }: {
   anchor: RefObject<HTMLButtonElement | null>;
   /** What the panel opens above (the whole account foot, so the email stays in view); else the anchor. */
@@ -34,10 +38,13 @@ export function SettingsPanel({
   /** Render in place (the phone panel) rather than floating at the page's top level. */
   inline?: boolean;
   onClose: () => void;
+  /** Keyboard shortcuts: the caller closes this panel and opens the shortcuts list. */
+  onShowShortcuts: () => void;
 }) {
   const { theme, textSize } = usePreferences();
   const panel = useRef<HTMLDivElement | null>(null);
   const [place, setPlace] = useState<CSSProperties>({ opacity: 0 });
+  const [signingOut, setSigningOut] = useState(false);
 
   useLayoutEffect(() => {
     if (inline) {
@@ -124,6 +131,24 @@ export function SettingsPanel({
         </div>
         <p className="settings-note">{SIZE_LABEL[textSize]}</p>
       </fieldset>
+      <button type="button" className="secondary-btn shortcuts-btn" aria-haspopup="dialog" onClick={onShowShortcuts}>
+        <Icon name="keyboard" /> Keyboard shortcuts
+      </button>
+      <button
+        type="button"
+        className="secondary-btn sign-out-btn"
+        disabled={signingOut}
+        onClick={() => {
+          setSigningOut(true);
+          // Ending the session sends the guard to /auth; the panel goes with the mail screens.
+          void signOut().catch(() => {
+            setSigningOut(false);
+            store.toast('Couldn’t sign out. Try again.');
+          });
+        }}
+      >
+        {signingOut ? 'Signing out…' : 'Sign out'}
+      </button>
     </div>
   );
   return inline ? content : createPortal(content, document.body);

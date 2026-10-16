@@ -24,6 +24,8 @@ This spec describes how each VibeMail Glass view behaves. It relies on [`CONTRAC
   - The client never supplies a `draftId` in a request body and never generates one. It only echoes a received `draftId` back in the path of `PATCH /api/v1/drafts/{draftId}` and `DELETE /api/v1/drafts/{draftId}`.
 - **One message cache.** All views share one client-side cache of `MessageDTO`s keyed by `gmailId`. Any response that returns a `message` replaces the cached entry, so every view shows the server's latest `labelIds`, `status`, `isRead` and `isStarred`.
 - **Stored mail only.** The list, thread view and search show only the messages the backend has stored, never the whole Gmail mailbox. These are the 50 newest INBOX messages at connect time, plus every later change pushed by Gmail.
+- **Keyboard.** Every control is reachable with Tab, in reading order (sidebar, header, list), and shows a visible focus indicator when focused from the keyboard. A control that is hidden at rest (a row's unstarred star) appears at full strength when it takes keyboard focus, as on hover. A control that disappears when used (the search field's clear button) leaves focus on the field it belongs to.
+- **Touch targets.** On touch screens every tappable area is at least 44 × 44px. Standalone buttons, chips, header and drawer controls, and input fields grow to 44px. Small controls inside rows, cards and fields (checkboxes, stars, a row's menu, close and clear buttons, recipient pills, the Settings options) keep their visible size and gain an invisible hit area, centred on them, that reaches 44px.
 
 ---
 
@@ -36,7 +38,7 @@ Primary endpoints:
 
 ### Default state
 
-- **Layout.** A vertical list of glass rows, newest first, as the server orders them (`internalDate` descending). The labels are in the sidebar on the left (see Label sidebar below), with **All** active; the list is headed by the active label's name.
+- **Layout.** A vertical list of glass rows, newest first, as the server orders them (`internalDate` descending). The labels are chips in the sidebar on the left (see Label sidebar below), with **All** active; the list is headed by the active chip's name.
 - **Row content.** Each row shows:
   - `fromAddress`, display name only when the raw value has the form `Name <addr>`;
   - `subject` (or "(no subject)" when `null`);
@@ -44,7 +46,7 @@ Primary endpoints:
   - `internalDate`, as a relative time;
   - a star icon reflecting `isStarred`;
   - a paperclip icon when `attachments` is non-empty.
-- **Unread rows.** When `isRead` is `false`, the row has bold `fromAddress` and `subject` and a glowing left edge.
+- **Unread rows.** When `isRead` is `false`, the row has bold `fromAddress` and `subject` and an 8px accent dot with a soft accent glow, just right of the relative time. Read rows show no dot. The row's accessible name ends with ", unread".
 - **Header.** Shows "Synced {relative time}" from the response's `lastSyncedAt`, or "Syncing your mailbox…" when `lastSyncedAt` is `null`.
 - **Page size.** The first page is requested with `limit=25` and no `cursor`.
 
@@ -65,7 +67,7 @@ Primary endpoints:
 - **Undo:** archive, trash and restore show a toast with an Undo button for 5 seconds. Undo sends the inverse `PATCH`.
 - **Load more:** when the user scrolls within one screen of the end, the app requests `GET /api/v1/messages` with the last `nextCursor`. This stops when `nextCursor` is `null`.
 - **Refresh:** pull to refresh, or the refresh button, reloads from the first page with no `cursor`. The refresh never calls Gmail; it only re-reads what push has stored.
-- **Compose:** the floating compose button opens the compose drawer in its default state.
+- **Compose:** the **Compose** button at the top of the sidebar, or on phones the floating button fixed at the bottom-right corner (16px from the right edge, 24px plus the safe-area inset from the bottom), opens the compose drawer in its default state. The floating button is hidden while the drawer is open.
 - **Search:** focusing the search field starts the search view (§5).
 
 ### Selection
@@ -125,25 +127,29 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 
 ### Label sidebar
 
-- **Placement.** From 768px wide, a sidebar on the left holds the product name, the **Compose** button and the labels. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and a toggle in its header collapses it to icons only (56px; names become tooltips, custom labels show a short id like `#12`). Width and mode are remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a label or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button.
-- **Counts.** Every label shows a right-aligned count of its new mail; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
+- **Placement.** From 768px wide, a sidebar on the left holds, top to bottom: the product name, the full-width **Compose** button, the labels as chips (§4), and the account foot. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and a toggle in its header collapses it to icons only (56px; names become tooltips, custom labels show a short id like `#12`). Width and mode are remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a chip or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button. Collapsed to icons only, Compose becomes a 40px icon button with its name as tooltip.
+- **Chips.** Every label is a chip, one per line and the sidebar's full width: a glass pill (`surface-soft` fill, 1px `glass-edge` border, 4px radius) with its icon, name and count. On touch screens each chip is at least 44px tall. Collapsed to icons only, the chips become 40px icon buttons.
+- **Counts.** Every chip shows a right-aligned count of its new mail; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
   - **All, Starred, Archive, Trash and custom labels:** how many loaded messages they match, by the filter's rule, that are unread (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening or marking a message read lowers every count it was in; marking it unread raises them.
   - **Drafts:** drafts have no unread state, so it counts the drafts listed (§4 Drafts), in `mute`, with a `+` (`25+`) while the list has more pages.
   - Message counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they can grow as the list pages.
-- **Fixed labels.** The sidebar always lists five fixed labels, in this order: **All**, **Starred**, **Drafts**, **Archive**, **Trash**. They are present even when they match nothing. Drafts is not a filter: it shows the draft list (§4 Drafts).
-- **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one entry per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
+- **Fixed labels.** The sidebar always shows five fixed label chips, in this order: **All**, **Starred**, **Archive**, **Trash**, **Drafts**. They are present even when they match nothing. Drafts is not a filter: it shows the draft list (§4 Drafts).
+- **Custom labels.** Custom Gmail labels follow under a "Labels" heading, one chip per distinct `labelIds` entry starting with `Label_` across the loaded messages, sorted alphabetically. They appear and disappear as loaded messages change.
   - The contract has no label-name endpoint, so a custom label shows the label ID.
-- **Selection.** Exactly one label is active at a time. The active label has the brightest glass fill and a 1px accent border.
-- **Overflow.** The sidebar scrolls vertically when the labels overflow. The five fixed labels stay first and are never collapsed into a menu.
+- **Selection.** Exactly one chip or label is active at a time. The active one has the brightest glass fill and a 1px accent border.
+- **Overflow.** The sidebar scrolls vertically when the labels overflow. The chips and Drafts stay first and are never collapsed into a menu.
 - **From a thread or a search.** Choosing a label returns to the inbox list on that label, ending any search.
 - **Filtering.** Chip behaviour, matching rules and states are specified in §4 (Label filter).
 
 ### Account and Settings
 
 - **Account.** The foot of the sidebar shows the signed-in account's email (the Supabase session's `user.email`), after an initial in an avatar, truncated with the full address as a tooltip. Icons only, just the initial shows, with the email as its tooltip.
-- **Settings.** Under the email, a **Settings** button (`sliders` icon) opens a raised-glass Settings panel above the account block (beside the button when the sidebar shows icons only; inside the panel on phones, so it stays within that dialog). It holds two radio groups:
+- **Settings.** Under the email, a **Settings** button (`sliders` icon) opens a raised-glass Settings panel above the account block (beside the button when the sidebar shows icons only; inside the panel on phones, so it stays within that dialog). It holds two radio groups, Keyboard shortcuts and Sign out:
   - **Appearance:** Dark (the default), Light, or System, which follows the device's light or dark setting as it changes.
   - **Text size:** Small, Default, Large, Larger, each shown as an "A" at that size. Every font size and line height scales with it (0.9, 1, 1.12, 1.25); spacing and icons keep their size.
+  - **Keyboard shortcuts:** a full-width secondary button (`keyboard` icon) under the two groups. It closes Settings and opens the shortcuts list: a modal raised-glass panel over a scrim, above the phone's sidebar panel, titled "Keyboard shortcuts". It lists every shortcut the app supports, grouped by where it works (Anywhere, Message list, Conversation, Compose, Sidebar), each as its action and its keys as key caps, with alternatives joined by "or". The modifier reads ⌘ on Apple devices and Ctrl elsewhere. The list scrolls inside the panel when taller than the screen; on phones each shortcut's keys sit under its name. Like the compose drawer it is modal (the app behind is inert, Tab wraps inside it). Escape, its close button or a click on the scrim closes it, and focus returns to the Settings button.
+  - **Sign out:** a full-width secondary button under Keyboard shortcuts. It ends the session (the Supabase session; in sample mode, the local stand-in), clears the cached mail, and returns to the sign-in page. While it runs it reads "Signing out…" and is disabled; if it fails, it is enabled again and a toast reads "Couldn't sign out. Try again."
+- The panel is raised glass with square corners, like every raised surface, and shares the compose drawer's denser tint (§3), so its text reads cleanly over whatever is behind it.
 - A change applies at once and is kept on the device; it is applied before the first paint, so the page never flashes the other theme. Escape, a click outside, or the button again closes the panel, and focus returns to the button.
 - **Light theme.** The same glass over a pale blue-grey ground: white glass rising toward white, navy hairlines and shadows, near-black text, a dark primary button. The accent keeps its one value. Every text token keeps 4.5:1 on its grounds, as in dark; the star keeps 3:1 as an icon, so words in warning (Not saved) use a darker `warning-text`.
 
@@ -208,6 +214,8 @@ Primary endpoints:
 
 The drawer edits the request fields `to`, `subject`, `body` and `threadId` (§4.3, §3.7). It holds at most one `draftId`, which it received from the server.
 
+The drawer is a modal dialog. While it is open the app behind it is inert (no clicks, no keyboard focus, hidden from screen readers), and Tab and Shift+Tab wrap around the drawer's own controls. Closing it, by any route, returns focus to the control that opened it (the Compose button, Reply, or a draft in the list).
+
 ### Default state
 
 - **Opening.** The drawer slides up from the bottom (mobile) or the bottom-right corner (desktop) as a heavy glass sheet.
@@ -227,7 +235,7 @@ The drawer edits the request fields `to`, `subject`, `body` and `threadId` (§4.
 
 ### Draft-restored state
 
-- **When.** When the drawer opens, the client finds the snapshot of the last successful `DraftDTO` it received, kept in local storage, and the user has neither sent nor discarded that draft.
+- **When.** When the drawer opens, the client finds the snapshot of the last successful `DraftDTO` it received, kept in local storage, and the user has neither sent nor discarded that draft. **Compose** always means a new message: it restores the snapshot only when that snapshot is a new message. A snapshot of a reply is left saved (it stays in Drafts), and Compose opens the default state.
 - **What it shows.**
   - `to`, `subject`, `body` and `threadId` are filled from the snapshot.
   - The drawer keeps the snapshot's `draftId` for the next save.
@@ -314,7 +322,7 @@ Client-side only: there is no dedicated endpoint. The filter reads the `status`,
 
 ### Default state
 
-**All** is active. Chips match messages as follows:
+**All** is active. Every label is a chip in the sidebar, one per line (§1 Label sidebar). Each matches messages as follows:
 
 | Chip | Shows messages where |
 |---|---|
@@ -383,6 +391,7 @@ Primary endpoint: `GET /api/v1/messages/search` (§4.9, *v1.1*).
 - **When search is active.** The search field is focused and its trimmed text has at least 2 characters. The first request is sent 300 ms after the last keystroke.
 - **Inactive.** Below 2 characters, search is inactive and the inbox list is shown unchanged.
 - **Leaving search.** Clearing the field (the inline clear button) or pressing Escape ends search and restores the inbox with its previous chip and scroll position.
+- **Shortcut.** ⌘K on Apple devices, Ctrl+K elsewhere (with no other modifier), focuses the search field and selects its text, from anywhere except the compose drawer. When a thread covers the list (narrower than the side-by-side layout), it first returns to the inbox. While the field is empty and unfocused it shows the shortcut for the device (`⌘K` or `Ctrl K`) at its right edge.
 - **Query length.** The field accepts at most 200 characters.
 
 ### Default state

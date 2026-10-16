@@ -32,8 +32,8 @@ export interface OpenRequest {
  *  - a draft from the list            → draft-restored (origin "list")
  *  - a reply, with a saved draft here → draft-restored (origin "device"), asking to replace it
  *  - a reply                          → reply
- *  - Compose, with a saved draft here → draft-restored (origin "device")
- *  - Compose                          → new, refilled with anything a failed send kept
+ *  - Compose, with a saved new message here → draft-restored (origin "device")
+ *  - Compose (a saved reply is left alone)  → new, refilled with anything a failed send kept
  */
 export function resolveOpening(request: OpenRequest): ComposeOpening {
   if (request.draft) {
@@ -43,7 +43,9 @@ export function resolveOpening(request: OpenRequest): ComposeOpening {
   if (request.reply) {
     return snapshot ? { mode: 'draft-restored', draft: snapshot, origin: 'device', replyAfter: request.reply } : { mode: 'reply', reply: request.reply };
   }
-  if (snapshot) {
+  // Compose means a new message: only a saved new message is picked up again. A saved reply stays
+  // saved (and in Drafts) for its own thread.
+  if (snapshot && !snapshot.requestedThreadId) {
     return { mode: 'draft-restored', draft: snapshot, origin: 'device' };
   }
   return { mode: 'new', unsent: loadUnsent() };

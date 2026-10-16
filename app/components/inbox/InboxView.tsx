@@ -14,8 +14,8 @@ import { MIN_QUERY, SearchBar } from '@/app/components/inbox/SearchBar';
 import { useNearEnd } from '@/app/components/inbox/useNearEnd';
 
 /**
- * The inbox view (DESIGN_SPEC.md §1): the search bar on top, then the message list for the label
- * chosen in the sidebar (§4). A query of 2+ characters swaps the list for search results (§5).
+ * The inbox view (DESIGN_SPEC.md §1): the search bar on top, then the message list for the chip,
+ * Drafts or custom label chosen in the sidebar (§4). A query of 2+ characters swaps the list for search results (§5).
  * The label and search live in `InboxUiProvider`, shared with the sidebar. Drafts is not a filter:
  * it swaps the list for the draft list (DraftsView), and Refresh then re-reads the drafts.
  *
@@ -73,6 +73,7 @@ export function InboxView({ covered }: { covered: boolean }) {
       <SearchBar
         value={searchText}
         searching={searchActive}
+        covered={covered}
         refreshing={showingDrafts ? drafts.refreshing : inbox.refreshing}
         refreshDisabled={
           showingDrafts ? drafts.refreshing || drafts.state === 'loading' : inbox.refreshing || inbox.state === 'loading'

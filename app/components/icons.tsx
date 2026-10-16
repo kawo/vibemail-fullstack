@@ -25,6 +25,8 @@ const ICONS = {
   'check-mixed': { d: 'M4.5 8h7' },
   // Two sliders, their knobs at different stops: display settings.
   sliders: { d: 'M2.5 4.75h11 M2.5 11.25h11 M6 3v3.5 M10.5 9.5v3.5' },
+  // A keyboard: a row of keys over a space bar, for the shortcuts list.
+  keyboard: { d: 'M1.75 4.25h12.5v7.5H1.75z M4 6.75h1 M7.5 6.75h1 M11 6.75h1 M5 9.25h6' },
   // A circular arrow, clockwise.
   refresh: { d: 'M13 8a5 5 0 1 1-1.5-3.55 M11.75 1.75v3h-3' },
   // Three bars: opens the sidebar on a phone.
