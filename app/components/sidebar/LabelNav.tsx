@@ -1,15 +1,16 @@
-import { type Chip, chipKey, chipLabel, countNoun, countText, showsCount } from '@/app/lib/filters';
+import { BAR_CHIPS, type Chip, chipKey, chipLabel, countNoun, countText, showsCount } from '@/app/lib/filters';
 import { labelMark } from '@/app/lib/sidebarWidth';
 import { Icon } from '@/app/components/icons';
 import { Glyph } from '@/app/components/ui';
 
 /**
- * The label filter as a vertical list (DESIGN_SPEC.md §4): the four fixed labels, always present
- * and in order, then one entry per custom `Label_…` ID among the loaded messages, alphabetically.
- * The active label is marked with `aria-current`; while a search runs, none is (results span every
- * status), and picking one ends the search.
+ * The sidebar's labels as a column of chips, one per line (DESIGN_SPEC.md §1 Label sidebar): All,
+ * Starred, Archive, Trash and Drafts, always present and in order, then one chip per custom
+ * `Label_…` ID among the loaded messages, alphabetically. The active chip is marked with
+ * `aria-current`; while a search runs, none is (results span every status), and picking one ends
+ * the search.
  *
- * Every label shows how many of its loaded messages are new (unread); Drafts, which has no unread
+ * Every chip shows how many of its loaded messages are new (unread); Drafts, which has no unread
  * state, how many drafts are listed (`25+` while more pages are unread). A zero shows nothing. Collapsed, the
  * count becomes a small badge on the icon and joins the tooltip.
  */
@@ -33,7 +34,8 @@ export function LabelNav({
   collapsed?: boolean;
   onSelect: (chip: Chip) => void;
 }) {
-  const fixed = chips.filter((c) => c.kind !== 'label');
+  // The four filters, then Drafts.
+  const fixed = [...BAR_CHIPS, ...chips.filter((c) => c.kind === 'drafts')];
   const custom = chips.filter((c) => c.kind === 'label');
   const item = (chip: Chip) => {
     const current = !searching && chipKey(chip) === chipKey(active);
@@ -54,12 +56,12 @@ export function LabelNav({
               <Icon name="inbox" />
             ) : chip.kind === 'starred' ? (
               <Glyph name="star" className="star-mark" />
-            ) : chip.kind === 'drafts' ? (
-              <Icon name="draft" />
             ) : chip.kind === 'archive' ? (
               <Icon name="archive" />
             ) : chip.kind === 'trash' ? (
               <Icon name="trash" />
+            ) : chip.kind === 'drafts' ? (
+              <Icon name="draft" />
             ) : collapsed && chip.kind === 'label' ? (
               labelMark(chip.labelId)
             ) : (

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { onApiSignal } from '@/app/services';
 import { AuthGuard, INITIAL_SYNC_FAILED_KEY } from '@/app/components/auth/AuthGuard';
-import { startSignIn } from '@/app/lib/auth/session';
+import { onSignedOut, startSignIn } from '@/app/lib/auth/session';
 import { ComposeProvider } from '@/app/components/compose/ComposeContext';
 import { ComposeButton, InboxView } from '@/app/components/inbox';
 import { Sidebar } from '@/app/components/sidebar';
@@ -83,6 +83,9 @@ function Shell() {
       }
     });
   }, []);
+
+  // Signing out from Settings drops the cached mail, so the next account starts clean.
+  useEffect(() => onSignedOut(() => store.reset()), []);
 
   const threadId = threadIdOf(path);
   return (

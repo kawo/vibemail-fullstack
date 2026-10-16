@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { focusables, trapTarget } from '@/app/lib/focus';
 import { ApiError, api } from '@/app/services';
 import type { DraftDTO, MessageDTO } from '@/app/services/types';
 import {
@@ -181,8 +182,12 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
 
-  // Lock the page behind the drawer, and focus the field each state starts in.
+  // Lock the page behind the drawer, and focus the field each state starts in. The app behind is
+  // inert while the drawer is open (no clicks, no Tab, hidden from screen readers). ComposeProvider
+  // gives focus back to whatever opened the drawer.
   useEffect(() => {
+    const behind = document.querySelector<HTMLElement>('.shell');
+    behind?.setAttribute('inert', '');
     document.body.classList.add('scroll-locked');
     if (init.mode === 'reply') {
       textInput.current?.focus();
@@ -195,7 +200,10 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     } else {
       toInput.current?.focus();
     }
-    return () => document.body.classList.remove('scroll-locked');
+    return () => {
+      document.body.classList.remove('scroll-locked');
+      behind?.removeAttribute('inert');
+    };
   }, [init.mode]);
 
   // Countdown tick while Send is rate-limited.
@@ -509,6 +517,14 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
             void send();
           } else if (e.key === 'Escape') {
             close();
+          } else if (e.key === 'Tab' && drawer.current) {
+            // A modal: Tab wraps around the drawer's controls instead of reaching the page behind.
+            const items = focusables(drawer.current);
+            const target = trapTarget(items, document.activeElement as HTMLElement, e.shiftKey);
+            if (target) {
+              e.preventDefault();
+              target.focus();
+            }
           }
         }}
         actions={{

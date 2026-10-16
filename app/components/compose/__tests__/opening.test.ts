@@ -30,6 +30,11 @@ describe('ComposeDrawer mode (DESIGN_SPEC.md §3)', () => {
     expect(resolveOpening({ draft })).toEqual({ mode: 'draft-restored', draft, origin: 'list' });
   });
 
+  it('Compose opens a new message even when the saved draft is a reply', () => {
+    device({ ...draft, threadId: 'offsite', subject: 'Re: Offsite', requestedThreadId: 'offsite' } as DraftDTO);
+    expect(resolveOpening({})).toMatchObject({ mode: 'new' });
+  });
+
   it('a saved draft on the device is restored, and a reply first asks to replace it', () => {
     device(draft);
     expect(resolveOpening({})).toMatchObject({ mode: 'draft-restored', origin: 'device', draft: { draftId: 'd1' } });

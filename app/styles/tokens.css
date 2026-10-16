@@ -69,7 +69,7 @@
   --glass-3: 0 16px 48px rgba(0, 0, 0, 0.4);
   --glass-raised: 0 24px 64px rgba(2, 6, 23, 0.6);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  --unread-glow: inset 2px 0 0 #007aff, -4px 0 12px -4px rgba(0, 122, 255, 0.6);
+  --unread-dot-glow: rgba(0, 122, 255, 0.6);
   --shimmer: rgba(255, 255, 255, 0.07);
   --blur-1: blur(20px);
   --blur-2: blur(28px);
@@ -164,7 +164,7 @@
   --glass-3: 0 16px 48px rgba(15, 23, 42, 0.1);
   --glass-raised: 0 24px 64px rgba(15, 23, 42, 0.18);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  --unread-glow: inset 2px 0 0 #007aff, -4px 0 12px -4px rgba(0, 122, 255, 0.35);
+  --unread-dot-glow: rgba(0, 122, 255, 0.35);
   --shimmer: rgba(15, 23, 42, 0.05);
 }
 

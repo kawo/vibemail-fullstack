@@ -17,6 +17,9 @@ export type Chip =
 /** The five fixed labels, always rendered first and in this order. */
 export const FIXED_CHIPS: readonly Chip[] = [{ kind: 'all' }, { kind: 'starred' }, { kind: 'drafts' }, { kind: 'archive' }, { kind: 'trash' }];
 
+/** The four status filters, which lead the sidebar's chips; Drafts follows them. */
+export const BAR_CHIPS: readonly Chip[] = FIXED_CHIPS.filter((c) => c.kind !== 'drafts');
+
 const notTrashOrSpam = (m: MessageDTO) => m.status !== 'trash' && m.status !== 'spam';
 
 export function matchesChip(message: MessageDTO, chip: Chip): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Chip, FIXED_CHIPS, chipFromParam, inboxQuery, chipCounts, chipLabel, countNoun, countText, customLabelIds, matchesChip, shouldFill, showsCount } from '@/app/lib/filters';
+import { BAR_CHIPS, type Chip, FIXED_CHIPS, chipFromParam, inboxQuery, chipCounts, chipLabel, countNoun, countText, customLabelIds, matchesChip, shouldFill, showsCount } from '@/app/lib/filters';
 import { message } from '@/app/lib/__tests__/fixtures';
 
 describe('label filter (DESIGN_SPEC.md §4)', () => {
@@ -14,6 +14,10 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
 
   it('always has the five fixed labels first, in order', () => {
     expect(FIXED_CHIPS.map(chipLabel)).toEqual(['All', 'Starred', 'Drafts', 'Archive', 'Trash']);
+  });
+
+  it('leads the sidebar with the four filters, in order, without Drafts', () => {
+    expect(BAR_CHIPS.map(chipLabel)).toEqual(['All', 'Starred', 'Archive', 'Trash']);
   });
 
   it('All excludes trash and spam', () => expect(ids({ kind: 'all' })).toEqual(['a', 'b', 'c', 'f']));
