@@ -11,3 +11,7 @@ jest-results.json
 .next/
 out/
 *.tsbuildinfo
+
+# Local tooling: dev-server launch config and brainstorming mockups
+.claude/launch.json
+.superpowers/
