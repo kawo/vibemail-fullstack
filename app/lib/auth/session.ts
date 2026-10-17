@@ -13,6 +13,7 @@ export interface AppSession {
 }
 
 let client: GoTrueClient | null = null;
+let warned = false;
 
 /**
  * Only Supabase Auth is needed (keep, refresh, sign out), so this uses the standalone client.
@@ -21,7 +22,10 @@ let client: GoTrueClient | null = null;
  */
 function supabase(): GoTrueClient | null {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set (see .env.example).');
+    if (!warned) {
+      warned = true; // Once per page: every session read would otherwise repeat it.
+      console.error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set (see .env.example).');
+    }
     return null;
   }
   if (!client) {
