@@ -50,7 +50,7 @@ interface Initial {
 }
 
 /** Whether VibeMail has stored a message in this thread (a listed draft is then a reply). */
-const hasStoredThread = (threadId: string): boolean => store.inbox.ids.some((id) => store.get(id)?.threadId === threadId);
+const hasStoredThread = (threadId: string): boolean => store.hasThread(threadId);
 
 function initialState(opening: ComposeOpening): Initial {
   switch (opening.mode) {
@@ -361,7 +361,8 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
         body: current.body,
         ...(current.threadId ? { threadId: current.threadId } : {}),
       });
-      store.addToInbox(message);
+      // Cached, and placed in every loaded list it belongs to (All, as a sent message).
+      store.upsert(message);
       afterSent('Sent');
     } catch (error) {
       setSending(false);

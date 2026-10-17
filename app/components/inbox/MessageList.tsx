@@ -2,45 +2,38 @@ import { type Ref, useRef, useState } from 'react';
 import type { MessageDTO } from '@/app/services/types';
 import { type Chip, emptyStateText } from '@/app/lib/filters';
 import { relativeTime } from '@/app/lib/format';
-import type { InboxState } from '@/state/store';
+import type { ListState } from '@/state/store';
 import { Panel, Skeletons } from '@/app/components/ui';
 import { MessageRow } from '@/app/components/MessageRow';
 
 const PULL_PX = 70;
 
 /**
- * The inbox list and every state it can be in (DESIGN_SPEC.md §1, §4): first-load skeletons,
- * the load error, the three empty states, the rows, and the paging rows at the end
- * (loading more, "Looking for more…", "Couldn't load more · Retry", "Look further").
- * Pull to refresh re-reads the first page.
+ * One label's server-filtered list and every state it can be in (DESIGN_SPEC.md §1, §4):
+ * first-load skeletons, the load error, the three empty states, the rows, and the paging rows at
+ * the end (loading more, "Couldn't load more · Retry"). Pull to refresh re-reads the first page.
  */
 export function MessageList({
-  inbox,
+  list,
   loadedCount,
   visible,
   chip,
   pending,
-  filling,
-  lookFurther,
   sentinel,
   onRetry,
   onRefresh,
   onLoadMore,
-  onLookFurther,
   selection,
 }: {
-  inbox: InboxState;
+  list: ListState;
   loadedCount: number;
   visible: readonly MessageDTO[];
   chip: Chip;
   pending: ReadonlySet<string>;
-  filling: boolean;
-  lookFurther: boolean;
   sentinel: Ref<HTMLDivElement>;
   onRetry: () => void;
   onRefresh: () => void;
   onLoadMore: () => void;
-  onLookFurther: () => void;
   selection: { order: readonly string[]; selecting: boolean };
 }) {
   const [pull, setPull] = useState(0);
@@ -48,12 +41,12 @@ export function MessageList({
   const emptyChipText = emptyStateText(chip);
 
   let body;
-  if (inbox.state === 'loading' || inbox.state === 'idle') {
+  if (list.state === 'loading' || list.state === 'idle') {
     body = <Skeletons count={8} />;
-  } else if (inbox.state === 'error') {
+  } else if (list.state === 'error') {
     // GMAIL_NOT_CONNECTED is handled by the app-wide reconnect panel.
     body =
-      inbox.error?.code === 'GMAIL_NOT_CONNECTED' ? null : (
+      list.error?.code === 'GMAIL_NOT_CONNECTED' ? null : (
         <Panel
           title="Couldn’t load your mail"
           action={
@@ -63,14 +56,14 @@ export function MessageList({
           }
         />
       );
-  } else if (visible.length === 0 && !filling) {
+  } else if (visible.length === 0) {
     if (emptyChipText) {
       body = (
         <Panel empty title={emptyChipText}>
           {chip.kind !== 'starred' && <p>Only mail VibeMail has synced appears here.</p>}
         </Panel>
       );
-    } else if (inbox.lastSyncedAt === null && loadedCount === 0) {
+    } else if (list.lastSyncedAt === null && loadedCount === 0) {
       body = (
         <Panel empty title="Your mailbox is syncing">
           <p>New mail will appear here as it arrives.</p>
@@ -79,7 +72,7 @@ export function MessageList({
     } else {
       body = (
         <Panel empty title="You’re all caught up">
-          {inbox.lastSyncedAt && <p>Synced {relativeTime(inbox.lastSyncedAt)}</p>}
+          {list.lastSyncedAt && <p>Synced {relativeTime(list.lastSyncedAt)}</p>}
         </Panel>
       );
     }
@@ -105,39 +98,31 @@ export function MessageList({
         }
       }}
       onTouchEnd={() => {
-        if (pull >= PULL_PX && inbox.state === 'ready') {
+        if (pull >= PULL_PX && list.state === 'ready') {
           onRefresh();
         }
         setPull(0);
         pullStart.current = null;
       }}
     >
-      <div className="pull" style={{ height: inbox.refreshing ? 44 : pull * 0.5 }} aria-hidden={!inbox.refreshing}>
-        {(inbox.refreshing || pull > 0) && <span className="spinner" />}
+      <div className="pull" style={{ height: list.refreshing ? 44 : pull * 0.5 }} aria-hidden={!list.refreshing}>
+        {(list.refreshing || pull > 0) && <span className="spinner" />}
       </div>
 
       {body}
 
-      {inbox.state === 'ready' && (
+      {list.state === 'ready' && (
         <>
-          {(inbox.loadingMore || filling) && (
+          {list.loadingMore && (
             <div className="inline-row">
               <span className="spinner" />
-              {filling && chip.kind !== 'all' ? 'Looking for more…' : null}
             </div>
           )}
-          {inbox.moreError && !inbox.loadingMore && (
+          {list.moreError && !list.loadingMore && (
             <div className="inline-row">
               Couldn’t load more ·{' '}
               <button type="button" className="link-btn" onClick={onLoadMore}>
                 Retry
-              </button>
-            </div>
-          )}
-          {lookFurther && !inbox.loadingMore && (
-            <div className="inline-row">
-              <button type="button" className="link-btn" onClick={onLookFurther}>
-                Look further
               </button>
             </div>
           )}

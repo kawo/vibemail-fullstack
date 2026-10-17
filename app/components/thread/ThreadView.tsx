@@ -55,8 +55,8 @@ export function ThreadView({ threadId }: { threadId: string }) {
 
   const messages = ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined);
   const newestId = messages[messages.length - 1]?.gmailId;
-  // While loading, show what the inbox already knows about this thread.
-  const cached = state === 'loading' ? s.inbox.ids.map((id) => s.get(id)).find((m) => m?.threadId === threadId) : undefined;
+  // While loading, show what the cache already knows about this thread.
+  const cached = state === 'loading' ? s.all().find((m) => m.threadId === threadId) : undefined;
   const back = () => navigate(INBOX_PATH);
 
   const toggle = (message: MessageDTO) => {

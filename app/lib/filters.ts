@@ -1,8 +1,9 @@
 import type { MessageDTO } from '@/app/services/types';
 
 /**
- * Label filter (DESIGN_SPEC.md §4): client-side only, on `status`, `isStarred` and `labelIds`.
- * `status` is read, never computed or set here. Drafts is a label in the sidebar but not a filter:
+ * Labels (DESIGN_SPEC.md §4). The server filters each label's list (CONTRACT.md §4.2 `label`);
+ * `matchesChip` mirrors its rules only to keep loaded lists in step after a change and to count
+ * unread mail. `status` is read, never computed or set here. Drafts is a label in the sidebar but not a filter:
  * drafts are never stored messages (CONTRACT.md §3.5), so it shows the draft list (§4.13) instead.
  */
 
@@ -128,15 +129,10 @@ export function emptyStateText(chip: Chip): string | null {
   }
 }
 
-/** Fill rule: keep paging until 25 matches, five extra pages, or no `nextCursor`. */
-export const FILL_TARGET = 25;
-export const FILL_MAX_PAGES = 5;
-
-export function shouldFill(matches: number, pagesFetched: number, nextCursor: string | null): boolean {
-  return matches < FILL_TARGET && pagesFetched < FILL_MAX_PAGES && nextCursor !== null;
-}
-
-/** The `?label=` value for a label: its kind, or the custom label's ID. */
+/**
+ * The `label` value for a label: its kind, or the custom label's ID. The same value names the
+ * label in the address (`/inbox?label=starred`) and in `GET /api/v1/messages?label=` (CONTRACT.md §4.2).
+ */
 export function chipParam(chip: Chip): string {
   return chip.kind === 'label' ? chip.labelId : chip.kind;
 }

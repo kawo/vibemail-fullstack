@@ -131,12 +131,14 @@ export function useInboxUi(): InboxUi {
   return value;
 }
 
-/** The loaded inbox messages (from the shared cache), the labels they produce, and per-label counts. */
+/**
+ * Every cached message (whichever label's list, search or thread loaded it), the custom labels
+ * they carry, and per-label unread counts. Counts cover only what has loaded (DESIGN_SPEC.md §1).
+ */
 export function useLoadedMessages(): { loaded: MessageDTO[]; chips: Chip[]; counts: Map<string, number> } {
   const s = useStore();
   const version = s.getVersion();
-  const ids = s.inbox.ids;
-  const loaded = useMemo(() => ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined), [ids, version, s]);
+  const loaded = useMemo(() => s.all(), [version, s]);
   const chips = useMemo(() => [...FIXED_CHIPS, ...customLabelIds(loaded).map((labelId): Chip => ({ kind: 'label', labelId }))], [loaded]);
   const counts = useMemo(() => chipCounts(loaded, chips), [loaded, chips]);
   return { loaded, chips, counts };
