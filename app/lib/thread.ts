@@ -77,3 +77,24 @@ export function moveTargets(kind: 'archive' | 'trash' | 'restore', messages: rea
       return messages.filter((m) => m.status === 'trash');
   }
 }
+
+/**
+ * Which body an expanded card shows (DESIGN_SPEC.md §2): `bodyPlain` first, the sandboxed
+ * `bodyHtml` only when there is no plain text, otherwise the snippet. Blank text counts as none,
+ * so a whitespace-only part never leaves the card empty.
+ */
+export function bodyKind(message: Pick<MessageDTO, 'bodyPlain' | 'bodyHtml'>): 'plain' | 'html' | 'snippet' {
+  if (message.bodyPlain?.trim()) {
+    return 'plain';
+  }
+  return message.bodyHtml?.trim() ? 'html' : 'snippet';
+}
+
+/**
+ * The conversation in Gmail's web app. Gmail accepts the API's thread ID in the `#all/` fragment;
+ * `authuser` opens the signed-in account when the browser holds several Google accounts.
+ */
+export function gmailThreadUrl(threadId: string, email: string | null): string {
+  const account = email ? `?authuser=${encodeURIComponent(email)}` : '';
+  return `https://mail.google.com/mail/${account}#all/${threadId}`;
+}

@@ -1,6 +1,7 @@
 import type { MessageDTO } from '@/app/services/types';
 import { useCompose } from '@/app/components/compose/ComposeContext';
 import { displayName, formatSize } from '@/app/lib/format';
+import { bodyKind } from '@/app/lib/thread';
 import { MessageRow } from '@/app/components/MessageRow';
 import { toggleStar } from '@/state/actions';
 import { HtmlBody } from '@/app/components/thread/HtmlBody';
@@ -11,7 +12,7 @@ import { Glyph } from '@/app/components/ui';
  *
  * Its header line is the shared MessageRow (variant "thread"): collapsed, avatar, sender,
  * snippet, time and a chevron. Expanded, recipients follow below it; then the body
- * (`bodyHtml` sandboxed, else `bodyPlain`, else `snippet`), attachments, and Reply. The newest
+ * (`bodyPlain`, else `bodyHtml` sandboxed, else `snippet`; see `bodyKind`), attachments, and Reply. The newest
  * card carries the primary Reply; any other expanded card has a quieter one.
  */
 export function MessageCard({
@@ -27,6 +28,7 @@ export function MessageCard({
 }) {
   const compose = useCompose();
   const sent = message.status === 'sent';
+  const kind = bodyKind(message);
 
   return (
     <article className={`glass card${expanded ? ' expanded' : ''}${sent ? ' sent' : ''}`}>
@@ -37,12 +39,12 @@ export function MessageCard({
             to {message.toAddress.map(displayName).join(', ') || '—'}
             {message.ccAddresses.length > 0 && <> · cc {message.ccAddresses.map(displayName).join(', ')}</>}
           </div>
-          {message.bodyHtml ? (
+          {kind === 'html' ? (
             <div className="html-body">
-              <HtmlBody html={message.bodyHtml} />
+              <HtmlBody html={message.bodyHtml ?? ''} />
             </div>
           ) : (
-            <div className="body-plain">{message.bodyPlain ?? message.snippet}</div>
+            <div className="body-plain">{kind === 'plain' ? message.bodyPlain : message.snippet}</div>
           )}
           {message.attachments.length > 0 && (
             <div className="attachments" aria-label="Attachments">

@@ -123,7 +123,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
     const canRetry = code === 'INTERNAL' || error?.canRetry === true;
     return (
       <div className="thread-pane">
-        <ThreadHeader controls={null} onBack={back} />
+        <ThreadHeader threadId={threadId} controls={null} onBack={back} />
         {!handledElsewhere && (
           <Panel
             title={title}
@@ -147,6 +147,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
   return (
     <div className="thread-pane">
       <ThreadHeader
+        threadId={threadId}
         onBack={back}
         controls={
           state === 'ready'

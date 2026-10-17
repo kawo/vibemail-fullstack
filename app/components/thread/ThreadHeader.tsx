@@ -1,19 +1,23 @@
 import { SPLIT, useMediaQuery } from '@/app/lib/breakpoints';
+import { gmailThreadUrl } from '@/app/lib/thread';
+import { useAccountEmail } from '@/app/components/sidebar/useAccountEmail';
 import { Icon } from '@/app/components/icons';
 import { Glyph } from '@/app/components/ui';
 
 /**
  * The thread view's sticky header (DESIGN_SPEC.md §2): back (or close, beside the list) on the
- * left; on the right four icon buttons: the read/unread toggle, the conversation star, Archive and
- * Move to trash, which becomes Restore (back to the inbox) for a conversation opened from Trash or
+ * left; on the right: the read/unread toggle, the conversation star, a "View in Gmail" link (a new
+ * tab, on the signed-in account), Archive and Move to trash, which becomes Restore (back to the inbox) for a conversation opened from Trash or
  * wholly in it. Archive is disabled when nothing in the conversation is in the inbox. Each keeps its name as its accessible label and tooltip. The controls on the
  * right appear once the thread has loaded; back works at once. While an action runs, a spinner
  * leads them and they are disabled.
  */
 export function ThreadHeader({
+  threadId,
   controls,
   onBack,
 }: {
+  threadId: string;
   controls: null | {
     unread: boolean;
     starred: boolean;
@@ -30,6 +34,7 @@ export function ThreadHeader({
 }) {
   // Beside the list the thread is closed, not left: an x instead of a back arrow.
   const split = useMediaQuery(SPLIT);
+  const email = useAccountEmail();
   const readLabel = controls?.unread ? 'Mark as read' : 'Mark as unread';
   const starLabel = controls?.starred ? 'Unstar conversation' : 'Star conversation';
 
@@ -64,6 +69,16 @@ export function ThreadHeader({
           >
             <Glyph name={controls.starred ? 'star' : 'unstar'} />
           </button>
+          <a
+            className="icon-btn"
+            href={gmailThreadUrl(threadId, email)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="View in Gmail"
+            title="View in Gmail"
+          >
+            <Icon name="external" />
+          </a>
           <button
             type="button"
             className="icon-btn"
