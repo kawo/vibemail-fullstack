@@ -3,7 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself.
-> Stack: Vercel Functions (Node.js runtime, `api/` directory, no framework) · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
+> Stack: Vercel Functions (Node.js runtime); the handlers live in `api/` and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
 
@@ -532,11 +532,7 @@ interface MarkReadResponse {
 
 ### 4.5 Gmail push webhook — `POST /webhook/gmail`
 
-Public path `/webhook/gmail`, outside `/api/v1`. The function file is `api/webhook/gmail.ts`, because Vercel serves functions only from `api/`. `vercel.json` maps the public path onto it:
-
-```json
-{ "rewrites": [{ "source": "/webhook/gmail", "destination": "/api/webhook/gmail" }] }
-```
+Public path `/webhook/gmail`, outside `/api/v1`. The handler is `api/webhook/gmail.ts`; *changed in v1.2*, the Next.js route `app/webhook/gmail/route.ts` serves it at that path directly (one project serves the frontend and every endpoint), so no rewrite is needed.
 
 The Pub/Sub push subscription endpoint is `https://<host>/webhook/gmail`.
 
@@ -546,7 +542,7 @@ Receives Gmail change notifications from a Cloud Pub/Sub **push** subscription a
 
 - `GOOGLE_PUBSUB_TOPIC`: a Pub/Sub topic (`projects/<p>/topics/<t>`) with publish rights granted to `gmail-api-push@system.gserviceaccount.com`.
 - `GOOGLE_PUBSUB_VERIFICATION_TOKEN`: a random string of at least 32 characters, shared with Pub/Sub through the push URL.
-- A push subscription whose endpoint is `https://<host>/webhook/gmail?token=<GOOGLE_PUBSUB_VERIFICATION_TOKEN>`. The `vercel.json` rewrite preserves the query string.
+- A push subscription whose endpoint is `https://<host>/webhook/gmail?token=<GOOGLE_PUBSUB_VERIFICATION_TOKEN>`.
 
 **Watch registration and renewal**
 
@@ -621,14 +617,11 @@ A Vercel Cron Job, run once a day, that renews the Gmail push watch (§4.5) for 
 
 **Configuration**
 
-- Function file: `api/cron/renew-watch.ts`, with its logic in `src/cron/renewWatch.ts`.
+- Handler: `api/cron/renew-watch.ts`, with its logic in `src/cron/renewWatch.ts`, served by the Next.js route `app/api/cron/renew-watch/route.ts` (`maxDuration = 300`; *changed in v1.2*).
 - `vercel.json`:
 
   ```json
-  {
-    "crons": [{ "path": "/api/cron/renew-watch", "schedule": "0 6 * * *" }],
-    "functions": { "api/cron/renew-watch.ts": { "maxDuration": 300 } }
-  }
+  { "crons": [{ "path": "/api/cron/renew-watch", "schedule": "0 6 * * *" }] }
   ```
 
 - Env: `CRON_SECRET`, a random string of at least 32 characters. Vercel sends it as `Authorization: Bearer <CRON_SECRET>` on every cron invocation.
