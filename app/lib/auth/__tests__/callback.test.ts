@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jwtClaims, parseCallback, signInMessage } from '../callback';
+import { parseCallback, signInMessage } from '../callback';
 
 describe('sign-in callback (CONTRACT.md §4.1b)', () => {
   it('reads the status from the query and the session from the fragment', () => {
@@ -21,11 +21,5 @@ describe('sign-in callback (CONTRACT.md §4.1b)', () => {
 
   it('treats a signed-in redirect without its fragment as expired', () => {
     expect(parseCallback('?status=signed_in', '')).toEqual({ ok: false, code: 'UNAUTHENTICATED' });
-  });
-
-  it('reads sub and email from a JWT payload, and ignores garbage', () => {
-    const payload = btoa(JSON.stringify({ sub: 'u1', email: 'you@vibemail.example' })).replace(/=+$/, '');
-    expect(jwtClaims(`h.${payload}.s`)).toEqual({ sub: 'u1', email: 'you@vibemail.example' });
-    expect(jwtClaims('not-a-jwt')).toBeNull();
   });
 });

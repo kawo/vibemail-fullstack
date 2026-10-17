@@ -166,7 +166,7 @@ const asApiError = (error: unknown): ApiError =>
 export async function loadInbox(options: { refresh?: boolean } = {}): Promise<void> {
   store.setInbox(options.refresh ? { refreshing: true } : { state: 'loading', error: null });
   try {
-    const page = await api.listMessages();
+    const page = await api.listMessages('all');
     store.upsertMany(page.messages);
     store.setInbox({
       ids: page.messages.map((m) => m.gmailId),
@@ -198,7 +198,7 @@ export async function loadMore(signal?: AbortSignal): Promise<void> {
   }
   store.setInbox({ loadingMore: true, moreError: null });
   try {
-    const page = await api.listMessages(nextCursor, 25, signal);
+    const page = await api.listMessages('all', nextCursor, 25, signal);
     store.upsertMany(page.messages);
     const known = new Set(store.inbox.ids);
     store.setInbox({

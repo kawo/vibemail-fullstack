@@ -1,4 +1,4 @@
-import { API_URL, currentSession, refreshSession, signOut } from '@/app/lib/auth/session';
+import { currentSession, refreshSession, signOut } from '@/app/lib/auth/session';
 import { ApiError, emitApiSignal } from './errors';
 import type { DataSource } from './source';
 import type {
@@ -36,7 +36,8 @@ interface CallOptions {
 }
 
 async function send(method: string, path: string, token: string | undefined, options: CallOptions): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
+  // Relative: the engine is served from this origin (Next.js route re-exports).
+  return fetch(path, {
     method,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -92,10 +93,10 @@ const query = (params: Record<string, string | number | undefined>): string => {
   return text ? `?${text}` : '';
 };
 
-/** Phase 2: the CONTRACT.md §4 endpoints over HTTP, by exact path (NEXT_PUBLIC_API_URL). */
+/** The CONTRACT.md §4 endpoints over HTTP, by exact relative path on this origin. */
 export const httpSource: DataSource = {
-  listMessages: (cursor?: string, limit = 25, signal?: AbortSignal) =>
-    call<ListMessagesResponse>('GET', `/api/v1/messages${query({ limit, cursor })}`, signal ? { signal } : {}),
+  listMessages: (label: string, cursor?: string, limit = 25, signal?: AbortSignal) =>
+    call<ListMessagesResponse>('GET', `/api/v1/messages${query({ limit, cursor, label })}`, signal ? { signal } : {}),
 
   markRead: (gmailId: string) =>
     call<{ message: MessageDTO }>('POST', `/api/v1/messages/${encodeURIComponent(gmailId)}/read`),

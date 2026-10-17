@@ -1,13 +1,13 @@
 import type { NextConfig } from 'next';
 
 /**
- * The VibeMail Glass web client: a Next.js (App Router) app at the repo root, beside the engine.
- * app/ holds the routes plus components/, lib/, services/ and styles/ (none of which has a page,
- * so none is routable); state/ and data/ sit at the root.
+ * One Next.js project serves the VibeMail Glass web client and the engine on one origin. app/
+ * holds the client's routes plus components/, lib/, services/ and styles/ (none of which has a
+ * page, so none is routable); app/api/** and app/webhook/** are route files that re-export the
+ * engine's handlers from api/. state/ sits at the root.
  *
- * It talks to the engine (api/, Vercel functions) over CONTRACT.md §4 at NEXT_PUBLIC_API_URL, so
- * there are no rewrites or API routes here. Next type-checks with tsconfig.next.json; the root
- * tsconfig.json and tsconfig.check.json stay the engine's.
+ * Next type-checks with tsconfig.next.json; the root tsconfig.json and tsconfig.check.json stay
+ * the engine's.
  */
 const config: NextConfig = {
   reactStrictMode: true,

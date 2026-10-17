@@ -40,24 +40,6 @@ export function parseCallback(search: string, hash: string): CallbackResult {
   };
 }
 
-/** The claims VibeMail reads from a Supabase access token (a JWT): `sub` and `email`. */
-export function jwtClaims(token: string): { sub?: string; email?: string } | null {
-  const payload = token.split('.')[1];
-  if (!payload) {
-    return null;
-  }
-  try {
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '='));
-    const claims = JSON.parse(json) as { sub?: unknown; email?: unknown };
-    return {
-      ...(typeof claims.sub === 'string' ? { sub: claims.sub } : {}),
-      ...(typeof claims.email === 'string' ? { email: claims.email } : {}),
-    };
-  } catch {
-    return null;
-  }
-}
-
 /** Plain-language text for a sign-in failure `code` / `reason` from the redirect. */
 export function signInMessage(code: string, reason?: string): string {
   if (code === 'GMAIL_NOT_CONNECTED') {
