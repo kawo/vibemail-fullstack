@@ -1,9 +1,12 @@
-import type { ListCursor, MessagesRepository } from '../db/messages';
+import type { ListCursor, ListFilter, MessagesRepository } from '../db/messages';
 import type { UsersRepository } from '../db/users';
 import { ApiError } from '../middleware/errors';
 import { type MessageDTO, toMessageDTO } from './dto';
 
-/** Message list read side, CONTRACT.md §4.2: every stored message (v1.1). Reads the DB only; never calls Gmail. */
+/**
+ * Message list read side, CONTRACT.md §4.2: stored messages filtered by `label` (v1.2). Reads the
+ * DB only; never calls Gmail.
+ */
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
@@ -40,7 +43,27 @@ export function decodeCursor(value: string): ListCursor {
   return { internalDate: new Date(d).toISOString(), gmailId: g };
 }
 
-export function parseListQuery(url: URL): { limit: number; cursor: ListCursor | null } {
+const LABEL_KEYWORDS = ['all', 'starred', 'archive', 'trash'] as const;
+const CUSTOM_LABEL = /^Label_[A-Za-z0-9_-]+$/;
+
+/** `label` (v1.2): one of the four keywords, or a custom Gmail label ID. Missing → `all`. */
+export function parseLabel(raw: string | null): ListFilter {
+  if (raw === null) {
+    return { kind: 'all' };
+  }
+  const keyword = LABEL_KEYWORDS.find((k) => k === raw);
+  if (keyword) {
+    return { kind: keyword };
+  }
+  if (CUSTOM_LABEL.test(raw)) {
+    return { kind: 'label', labelId: raw };
+  }
+  throw new ApiError('VALIDATION_FAILED', 'invalid label', {
+    details: { issues: [{ field: 'label', message: 'all, starred, archive, trash or a Label_ ID' }] },
+  });
+}
+
+export function parseListQuery(url: URL): { limit: number; cursor: ListCursor | null; filter: ListFilter } {
   const rawLimit = url.searchParams.get('limit');
   let limit = DEFAULT_LIMIT;
   if (rawLimit !== null) {
@@ -52,20 +75,21 @@ export function parseListQuery(url: URL): { limit: number; cursor: ListCursor | 
     limit = Number(rawLimit);
   }
   const rawCursor = url.searchParams.get('cursor');
-  return { limit, cursor: rawCursor ? decodeCursor(rawCursor) : null };
+  const filter = parseLabel(url.searchParams.get('label'));
+  return { limit, cursor: rawCursor ? decodeCursor(rawCursor) : null, filter };
 }
 
 export async function listMessages(
   deps: ListDeps,
   userId: string,
-  query: { limit: number; cursor: ListCursor | null },
+  query: { limit: number; cursor: ListCursor | null; filter: ListFilter },
 ): Promise<ListResponse> {
   const credentials = await deps.users.getUserCredentials(userId);
   if (!credentials) {
     throw new ApiError('GMAIL_NOT_CONNECTED', 'Gmail is not connected');
   }
   // Fetch one extra row to know whether another page exists.
-  const rows = await deps.messages.listMessages(userId, query.limit + 1, query.cursor);
+  const rows = await deps.messages.listMessages(userId, query.limit + 1, query.cursor, query.filter);
   const page = rows.slice(0, query.limit);
   const last = page[page.length - 1];
   const lastSyncedAt = await deps.users.getLastSyncedAt(userId);

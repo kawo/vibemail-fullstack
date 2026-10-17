@@ -241,6 +241,30 @@ describe('§4.2 GET /api/v1/messages', () => {
     expect(app.box.calls).toEqual([]);
   });
 
+  it('200: filters by label on the server (v1.2), against the real database', async () => {
+    const user = await createTestUser();
+    const app = buildApp();
+    await seedConnectedUser(app, user, { historyId: '10' });
+    await seedMessages(app, user, [
+      fakeMessage({ id: 'inb1', labels: ['INBOX'], receivedAt: new Date('2026-10-01T10:00:00Z') }),
+      fakeMessage({ id: 'arc1', labels: ['Label_3'], receivedAt: new Date('2026-10-02T10:00:00Z') }),
+      fakeMessage({ id: 'trs1', labels: ['TRASH'], receivedAt: new Date('2026-10-03T10:00:00Z') }),
+      fakeMessage({ id: 'lab1', labels: ['INBOX', 'Label_7', 'STARRED'], receivedAt: new Date('2026-10-04T10:00:00Z') }),
+    ]);
+    app.box.forbidCalls = true;
+    const ids = async (label: string) => {
+      const response = await app.handlers.listMessages(req.get(`/api/v1/messages?label=${label}`, bearerFor(user)));
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { messages: Array<{ gmailId: string }> }).messages.map((m) => m.gmailId);
+    };
+    expect(await ids('all')).toEqual(['lab1', 'arc1', 'inb1']);
+    expect(await ids('archive')).toEqual(['arc1']);
+    expect(await ids('trash')).toEqual(['trs1']);
+    expect(await ids('starred')).toEqual(['lab1']);
+    expect(await ids('Label_7')).toEqual(['lab1']);
+    expect(app.box.calls).toEqual([]);
+  });
+
   it("200: never returns another user's messages", async () => {
     const a = await createTestUser();
     const b = await createTestUser();

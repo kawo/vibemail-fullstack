@@ -22,6 +22,17 @@ export interface ListCursor {
 }
 
 /**
+ * Server-side list filter, CONTRACT.md §4.2 `label` (v1.2). Every kind but `archive` and `trash`
+ * leaves out `trash` and `spam`.
+ */
+export type ListFilter =
+  | { kind: 'all' }
+  | { kind: 'starred' }
+  | { kind: 'archive' }
+  | { kind: 'trash' }
+  | { kind: 'label'; labelId: string };
+
+/**
  * Maps a normalized message to the §5.1 columns: `from` → `from_address`, `to` → `to_address`,
  * `bodyText` → `body_plain`, flags from labels.
  */
@@ -62,8 +73,8 @@ export function toMessageRow(userId: string, message: ProviderMessage, syncedAt:
 }
 
 export interface MessagesRepository {
-  /** Every stored row, newest first, strictly after `after`. Returns at most `limit` rows (CONTRACT.md §4.2). */
-  listMessages(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]>;
+  /** Stored rows matching `filter`, newest first, strictly after `after`. Returns at most `limit` rows (CONTRACT.md §4.2). */
+  listMessages(userId: string, limit: number, after: ListCursor | null, filter: ListFilter): Promise<MessageRow[]>;
   /** The newest `limit` rows of one thread, newest first (CONTRACT.md §4.8). */
   listThread(userId: string, threadId: string, limit: number): Promise<MessageRow[]>;
   /**
@@ -105,8 +116,25 @@ export function createMessagesRepository(db: SupabaseClient<Database>): Messages
   }
 
   return {
-    async listMessages(userId, limit, after) {
+    async listMessages(userId, limit, after, filter) {
       let query = table().select('*').eq('user_id', userId);
+      switch (filter.kind) {
+        case 'archive':
+          query = query.eq('status', 'archived');
+          break;
+        case 'trash':
+          query = query.eq('status', 'trash');
+          break;
+        case 'starred':
+          query = query.not('status', 'in', '(trash,spam)').eq('is_starred', true);
+          break;
+        case 'label':
+          // labelId is validated as Label_[A-Za-z0-9_-]+ (CONTRACT.md §4.2): no filter syntax in it.
+          query = query.not('status', 'in', '(trash,spam)').contains('label_ids', [filter.labelId]);
+          break;
+        default:
+          query = query.not('status', 'in', '(trash,spam)');
+      }
       if (after) {
         // Values are an ISO timestamp and a Gmail ID: neither contains PostgREST filter syntax.
         query = query.or(

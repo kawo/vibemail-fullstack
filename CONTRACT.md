@@ -2,6 +2,7 @@
 
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are contracted but **not yet implemented**; their code, migration (§5.1 `status`) and tests follow under §6 and §7.
+> **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself.
 > Stack: Vercel Functions (Node.js runtime, `api/` directory, no framework) · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -372,7 +373,9 @@ If the configuration itself is missing (e.g. `FRONTEND_URL`), the callback answe
 
 Returns the user's stored messages from the DB, newest first. This endpoint **never calls Gmail**: the DB is kept current by push (§4.5).
 
-*Changed in v1.1:* the list returns every stored message, not only INBOX ones, so that the client can filter on `status` (§3.4): messages archived or trashed after they were stored, and messages sent through §4.3. It still holds only what the engine has stored (§3.5), never the whole mailbox.
+*Changed in v1.1:* the list covers every stored message, not only INBOX ones: messages archived or trashed after they were stored, and messages sent through §4.3. It still holds only what the engine has stored (§3.5), never the whole mailbox.
+
+*Changed in v1.2:* the `label` filter (below) selects among them on the server. Without it the list is `all`: every stored message except `trash` and `spam`.
 
 **Request**
 
@@ -381,13 +384,27 @@ Returns the user's stored messages from the DB, newest first. This endpoint **ne
 interface ListMessagesQuery {
   limit?: number;   // integer 1..100, default 25
   cursor?: string;  // opaque; value of a previous response's nextCursor
+  label?: string;   // Changed in v1.2: 'all' (default) | 'starred' | 'archive' | 'trash' | a custom label ID
 }
 ```
+
+**Filter** (*Changed in v1.2*). `label` selects which stored rows the list returns:
+
+| `label` | Rows where |
+|---|---|
+| `all` (also when absent) | `status` is not `trash` and not `spam` |
+| `starred` | `is_starred` and `status` is not `trash` or `spam` |
+| `archive` | `status = 'archived'` |
+| `trash` | `status = 'trash'` |
+| a custom label ID | `label_ids` contains it and `status` is not `trash` or `spam` |
+
+- `label` must be one of the four keywords, or a custom Gmail label ID matching `^Label_[A-Za-z0-9_-]+$`. System label IDs (`INBOX`, `UNREAD`, …) and an empty value are rejected.
+- A cursor is only meaningful with the `label` it was issued for: the client resends the same `label` with every page. The cursor itself does not carry the label.
 
 **Behavior**
 
 1. Authenticate (§3.1), then load `users` for the user.
-2. **Query:** select rows `WHERE user_id = $userId` (`$userId` from the verified token), ordered by `(internal_date DESC, gmail_id DESC)`, using keyset pagination from the cursor and `limit + 1` rows to compute `nextCursor`.
+2. **Query:** select rows `WHERE user_id = $userId` (`$userId` from the verified token) that match the filter, ordered by `(internal_date DESC, gmail_id DESC)`, using keyset pagination from the cursor and `limit + 1` rows to compute `nextCursor`.
 
 **Cursor:** `base64url(JSON.stringify({ d: internalDateISO, g: gmailId }))`. Clients treat it as opaque.
 
@@ -407,7 +424,7 @@ interface ListMessagesResponse {
 |---|---|---|
 | `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
 | `GMAIL_NOT_CONNECTED` | 409 | No `users` row, or `refresh_token` is `null` (never connected, or revoked). |
-| `VALIDATION_FAILED` | 400 | `limit` not an integer in 1..100, or `cursor` fails to decode or has the wrong shape. |
+| `VALIDATION_FAILED` | 400 | `limit` not an integer in 1..100, `cursor` fails to decode or has the wrong shape, or `label` is not one of the allowed values (v1.2). |
 | `INTERNAL` | 500 | DB error or an unexpected exception. |
 
 ---
