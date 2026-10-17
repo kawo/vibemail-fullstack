@@ -162,14 +162,27 @@ const asApiError = (error: unknown): ApiError =>
   error instanceof ApiError ? error : new ApiError(0, { code: 'INTERNAL', message: String(error), retryable: false });
 
 /**
+ * Each label's load generation. A first-page load (or refresh) starts a new one; a response from
+ * an older generation is dropped, so a page fetched with a cursor a refresh has replaced, or a
+ * slower earlier load of the same label, never lands on top of newer data.
+ */
+const generations = new Map<string, number>();
+const generationOf = (chip: Chip): number => generations.get(chipKey(chip)) ?? 0;
+
+/**
  * First page of a label's list, or a refresh (`GET /api/v1/messages?label=…`, no cursor). A list
  * that already has messages keeps showing them while it refreshes. Never calls Gmail.
  */
 export async function loadList(chip: Chip, options: { refresh?: boolean } = {}): Promise<void> {
+  const generation = generationOf(chip) + 1;
+  generations.set(chipKey(chip), generation);
   const shown = store.list(chip).state === 'ready';
-  store.setList(chip, shown ? { refreshing: true } : { state: 'loading', error: null });
+  store.setList(chip, shown ? { refreshing: true, loadingMore: false } : { state: 'loading', error: null, loadingMore: false });
   try {
     const page = await api.listMessages(chipParam(chip));
+    if (generationOf(chip) !== generation) {
+      return; // A newer load of this label owns the list now.
+    }
     store.upsertMany(page.messages);
     store.setList(chip, {
       ids: page.messages.map((m) => m.gmailId),
@@ -181,6 +194,9 @@ export async function loadList(chip: Chip, options: { refresh?: boolean } = {}):
       refreshing: false,
     });
   } catch (error) {
+    if (generationOf(chip) !== generation) {
+      return;
+    }
     const apiError = asApiError(error);
     store.setList(chip, shown ? { refreshing: false } : { state: 'error', error: apiError, refreshing: false });
     if (shown && options.refresh) {
@@ -191,13 +207,17 @@ export async function loadList(chip: Chip, options: { refresh?: boolean } = {}):
 
 /** Next page of a label's list, with its own cursor and label. A stale cursor (`VALIDATION_FAILED`) silently reloads from the start. */
 export async function loadMoreOf(chip: Chip, signal?: AbortSignal): Promise<void> {
-  const { nextCursor, loadingMore } = store.list(chip);
-  if (!nextCursor || loadingMore) {
-    return;
+  const { nextCursor, loadingMore, refreshing } = store.list(chip);
+  if (!nextCursor || loadingMore || refreshing) {
+    return; // A refresh replaces the cursor; paging waits for it.
   }
+  const generation = generationOf(chip);
   store.setList(chip, { loadingMore: true, moreError: null });
   try {
     const page = await api.listMessages(chipParam(chip), nextCursor, 25, signal);
+    if (generationOf(chip) !== generation) {
+      return; // Fetched with a cursor a newer load has replaced.
+    }
     store.upsertMany(page.messages);
     const current = store.list(chip);
     const known = new Set(current.ids);
@@ -208,6 +228,9 @@ export async function loadMoreOf(chip: Chip, signal?: AbortSignal): Promise<void
       loadingMore: false,
     });
   } catch (error) {
+    if (generationOf(chip) !== generation) {
+      return; // A newer load owns the list; this page's failure no longer matters.
+    }
     if (isAbort(error)) {
       store.setList(chip, { loadingMore: false });
       return;
