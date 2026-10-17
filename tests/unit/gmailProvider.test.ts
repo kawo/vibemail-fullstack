@@ -217,3 +217,63 @@ describe('GmailMailProvider drafts (CONTRACT.md §4.10–§4.12)', () => {
     });
   });
 });
+
+describe('GmailMailProvider.listDrafts (CONTRACT.md §4.13)', () => {
+  const b64 = (text: string) => Buffer.from(text, 'utf8').toString('base64url');
+  const full = (id: string, headers: Array<{ name: string; value: string }>, body: string | null) => ({
+    id,
+    message: {
+      id: `m-${id}`,
+      threadId: `t-${id}`,
+      labelIds: ['DRAFT'],
+      historyId: '42',
+      internalDate: '1791800000000',
+      payload: { mimeType: 'text/plain', headers, body: body === null ? { size: 0 } : { data: b64(body) } },
+    },
+  });
+
+  it('lists one page, gets each draft in full and maps it to the DraftDTO fields', async () => {
+    const { provider, calls } = providerWith((o) => {
+      if (/\/drafts$/.test(o.url)) {
+        return { data: { drafts: [{ id: 'r-1' }, { id: 'r-2' }], nextPageToken: 'p2' } };
+      }
+      const id = o.url.split('/').pop() ?? '';
+      return {
+        data:
+          id === 'r-1'
+            ? full('r-1', [{ name: 'To', value: 'Ada <ada@x.io>, bob@y.io' }, { name: 'Subject', value: 'Hi' }], 'Body')
+            : full('r-2', [], null),
+      };
+    });
+    await expect(provider.listDrafts({ limit: 2, pageToken: 'p1' })).resolves.toEqual({
+      drafts: [
+        { draftId: 'r-1', messageId: 'm-r-1', threadId: 't-r-1', to: ['Ada <ada@x.io>', 'bob@y.io'], subject: 'Hi', body: 'Body', updatedAt: new Date(1791800000000) },
+        { draftId: 'r-2', messageId: 'm-r-2', threadId: 't-r-2', to: [], subject: '', body: '', updatedAt: new Date(1791800000000) },
+      ],
+      nextPageToken: 'p2',
+    });
+    expect(calls[0]?.params).toMatchObject({ maxResults: 2, pageToken: 'p1' });
+    expect(calls.slice(1).map((c) => c.params?.format)).toEqual(['full', 'full']);
+  });
+
+  it('skips a draft deleted between the list and its get', async () => {
+    const { provider } = providerWith((o) => {
+      if (/\/drafts$/.test(o.url)) {
+        return { data: { drafts: [{ id: 'r-1' }, { id: 'gone' }] } };
+      }
+      if (o.url.endsWith('/gone')) {
+        throw { response: { status: 404 } };
+      }
+      return { data: full('r-1', [], 'x') };
+    });
+    const page = await provider.listDrafts({ limit: 25, pageToken: null });
+    expect(page.drafts.map((d) => d.draftId)).toEqual(['r-1']);
+    expect(page.nextPageToken).toBeNull();
+  });
+
+  it('handles an empty draft list', async () => {
+    const { provider, calls } = providerWith(() => ({ data: {} }));
+    await expect(provider.listDrafts({ limit: 25, pageToken: null })).resolves.toEqual({ drafts: [], nextPageToken: null });
+    expect(calls).toHaveLength(1);
+  });
+});

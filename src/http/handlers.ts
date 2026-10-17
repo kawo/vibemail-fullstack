@@ -1,5 +1,5 @@
 import { renewWatches, verifyCronSecret } from '../cron/renewWatch';
-import { createDraft, deleteDraft, updateDraft } from '../drafts';
+import { createDraft, deleteDraft, listDrafts, parseDraftListQuery, updateDraft } from '../drafts';
 import { ApiError } from '../middleware/errors';
 import { requireUser } from '../middleware/auth';
 import {
@@ -45,6 +45,7 @@ export interface Handlers {
   updateLabels: Handler;
   getThread: Handler;
   searchMessages: Handler;
+  listDrafts: Handler;
   createDraft: Handler;
   updateDraft: Handler;
   deleteDraft: Handler;
@@ -243,6 +244,11 @@ export function createHandlers(getDeps: () => AppDeps): Handlers {
     searchMessages: authenticated(async (deps, user, request) => {
       const query = parseSearchQuery(new URL(request.url));
       return jsonResponse(await searchMessages(deps, user.userId, query), 200);
+    }),
+
+    listDrafts: authenticated(async (deps, user, request) => {
+      const query = parseDraftListQuery(new URL(request.url));
+      return jsonResponse(await listDrafts(deps, user.userId, query), 200);
     }),
 
     createDraft: authenticated(async (deps, user, request) => {

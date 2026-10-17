@@ -1,6 +1,7 @@
 import {
   type AccountCredentials,
   type ChangePage,
+  type DraftPage,
   type DraftResult,
   type MailProvider,
   type MailProviderFactory,
@@ -33,7 +34,7 @@ export interface FakeMailbox {
   currentCursor: SyncCursor;
   sent: OutgoingMessage[];
   /** Gmail drafts by draft ID. */
-  drafts: Map<string, { message: OutgoingMessage; messageId: string; threadId: string }>;
+  drafts: Map<string, { message: OutgoingMessage; messageId: string; threadId: string; updatedAt?: Date }>;
   calls: FakeCall[];
   /** Scripted failures: the next call to the method rejects with this error, then the entry is removed. */
   failNext: Map<keyof MailProvider, ProviderError>;
@@ -206,7 +207,7 @@ class FakeMailProvider implements MailProvider {
     }
     const messageId = `draftmsg${this.box.calls.length}`;
     const threadId = message.threadId ?? messageId;
-    this.box.drafts.set(draftId, { message, messageId, threadId });
+    this.box.drafts.set(draftId, { message, messageId, threadId, updatedAt: new Date() });
     return { draftId, messageId, threadId };
   }
 
@@ -228,6 +229,26 @@ class FakeMailProvider implements MailProvider {
     if (!this.box.drafts.delete(draftId)) {
       throw new ProviderError('not_found', `draft ${draftId} not found`);
     }
+  }
+
+  /** Newest saved first, like Gmail. Page tokens are offsets; anything else is `invalid_request`. */
+  async listDrafts(options: { limit: number; pageToken: string | null }): Promise<DraftPage> {
+    this.record('listDrafts', [options]);
+    const offset = options.pageToken === null ? 0 : Number(options.pageToken);
+    if (!Number.isInteger(offset) || offset < 0) {
+      throw new ProviderError('invalid_request', `invalid page token ${options.pageToken}`);
+    }
+    const all = [...this.box.drafts.entries()].reverse();
+    const drafts = all.slice(offset, offset + options.limit).map(([draftId, d]) => ({
+      draftId,
+      messageId: d.messageId,
+      threadId: d.threadId,
+      to: d.message.to,
+      subject: d.message.subject,
+      body: d.message.text ?? '',
+      updatedAt: d.updatedAt ?? new Date(0),
+    }));
+    return { drafts, nextPageToken: offset + options.limit < all.length ? String(offset + options.limit) : null };
   }
 
   async watch(): Promise<WatchResult> {
