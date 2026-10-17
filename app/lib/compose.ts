@@ -125,3 +125,12 @@ export function joinQuote(text: string, quote: string | null): string {
   }
   return `${text.replace(/\s+$/, '')}\n\n${quote}`;
 }
+
+/**
+ * Whether a failed send went out anyway (CONTRACT.md §4.3): Gmail accepted the message but the
+ * follow-up read or store failed, and the error carries `details.sentGmailId`. Whatever its code,
+ * the drawer must close as sent and never offer to resend.
+ */
+export function wasSent(error: { code: string; details?: Record<string, unknown> }): boolean {
+  return typeof error.details?.sentGmailId === 'string';
+}

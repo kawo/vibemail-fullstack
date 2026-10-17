@@ -12,6 +12,7 @@ import {
   splitQuote,
   splitRecipients,
   validateForSend,
+  wasSent,
 } from '@/app/lib/compose';
 import {
   type DraftSnapshot,
@@ -367,6 +368,11 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     } catch (error) {
       setSending(false);
       const apiError = error instanceof ApiError ? error : asApiError(error);
+      if (wasSent(apiError)) {
+        // Gmail sent it; only the follow-up failed. Never resend (CONTRACT.md §4.3).
+        afterSent('Sent. It may take a moment to appear');
+        return;
+      }
       switch (apiError.code) {
         case 'UNAUTHENTICATED':
         case 'GMAIL_NOT_CONNECTED':
@@ -385,12 +391,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
           setNow(Date.now());
           return;
         default:
-          if (typeof apiError.details?.sentGmailId === 'string') {
-            // It *was* sent: never resend.
-            afterSent('Sent. It may take a moment to appear');
-            return;
-          }
-          setProblem({ kind: 'banner', text: 'Couldn’t send', retry: true });
+          setProblem({ kind: 'banner', text: 'Couldn’t send', retry: apiError.canRetry });
       }
     }
   };

@@ -40,8 +40,32 @@ export async function changeLabels(gmailId: string, change: UpdateLabelsRequest)
   return result;
 }
 
+/**
+ * After `GMAIL_RATE_LIMITED`, message actions (label changes and mark as read) stay disabled for
+ * `Retry-After` seconds (DESIGN_SPEC.md shared rules): a call in that window is refused here,
+ * with the seconds left, and never reaches the API.
+ */
+let blockedUntil = 0;
+
+function rateLimitGate(): ApiError | null {
+  const left = Math.ceil((blockedUntil - Date.now()) / 1000);
+  return left > 0 ? new ApiError(429, { code: 'GMAIL_RATE_LIMITED', message: 'Gmail is busy', retryable: true }, left) : null;
+}
+
+function noteRateLimit(error: ApiError): ApiError {
+  if (error.code === 'GMAIL_RATE_LIMITED') {
+    blockedUntil = Date.now() + (error.retryAfterSeconds ?? 30) * 1000;
+  }
+  return error;
+}
+
 /** `changeLabels` that hands the error back instead of reporting it (bulk actions sum them up). */
 async function tryChangeLabels(gmailId: string, change: UpdateLabelsRequest): Promise<MessageDTO | ApiError> {
+  const blocked = rateLimitGate();
+  if (blocked) {
+    store.setOverride(gmailId, null);
+    return blocked;
+  }
   store.setPending(gmailId, true);
   try {
     const { message } = await api.updateLabels(gmailId, change);
@@ -49,7 +73,7 @@ async function tryChangeLabels(gmailId: string, change: UpdateLabelsRequest): Pr
     return message;
   } catch (error) {
     store.setOverride(gmailId, null);
-    return asApiError(error);
+    return noteRateLimit(asApiError(error));
   } finally {
     store.setPending(gmailId, false);
   }
@@ -166,6 +190,11 @@ export async function bulk(kind: BulkKind, messages: readonly MessageDTO[]): Pro
 
 /** `markRead` that hands the error back instead of reporting it (bulk actions sum them up). */
 async function tryMarkRead(message: MessageDTO): Promise<MessageDTO | ApiError> {
+  const blocked = rateLimitGate();
+  if (blocked) {
+    store.setOverride(message.gmailId, null);
+    return blocked;
+  }
   store.setPending(message.gmailId, true);
   try {
     const { message: updated } = await api.markRead(message.gmailId);
@@ -173,7 +202,7 @@ async function tryMarkRead(message: MessageDTO): Promise<MessageDTO | ApiError> 
     return updated;
   } catch (error) {
     store.setOverride(message.gmailId, null);
-    return asApiError(error);
+    return noteRateLimit(asApiError(error));
   } finally {
     store.setPending(message.gmailId, false);
   }
@@ -184,6 +213,11 @@ export async function markRead(message: MessageDTO): Promise<boolean> {
   if (message.isRead) {
     return true;
   }
+  const blocked = rateLimitGate();
+  if (blocked) {
+    reportFailure(blocked, message.gmailId);
+    return false;
+  }
   store.setOverride(message.gmailId, { isRead: true });
   try {
     const { message: updated } = await api.markRead(message.gmailId);
@@ -191,7 +225,7 @@ export async function markRead(message: MessageDTO): Promise<boolean> {
     return true;
   } catch (error) {
     store.setOverride(message.gmailId, null);
-    reportFailure(asApiError(error), message.gmailId);
+    reportFailure(noteRateLimit(asApiError(error)), message.gmailId);
     return false;
   }
 }

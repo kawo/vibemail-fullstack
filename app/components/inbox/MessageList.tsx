@@ -50,9 +50,12 @@ export function MessageList({
         <Panel
           title="Couldn’t load your mail"
           action={
-            <button type="button" className="secondary-btn" onClick={onRetry}>
-              Retry
-            </button>
+            // Retry only when it can help: `retryable`, or INTERNAL (DESIGN_SPEC.md shared rules).
+            list.error?.canRetry ? (
+              <button type="button" className="secondary-btn" onClick={onRetry}>
+                Retry
+              </button>
+            ) : undefined
           }
         />
       );
@@ -120,10 +123,15 @@ export function MessageList({
           )}
           {list.moreError && !list.loadingMore && (
             <div className="inline-row">
-              Couldn’t load more ·{' '}
-              <button type="button" className="link-btn" onClick={onLoadMore}>
-                Retry
-              </button>
+              Couldn’t load more
+              {list.moreError.canRetry && (
+                <>
+                  {' · '}
+                  <button type="button" className="link-btn" onClick={onLoadMore}>
+                    Retry
+                  </button>
+                </>
+              )}
             </div>
           )}
           <div ref={sentinel} />
