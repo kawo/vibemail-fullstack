@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { chipKey, chipLabel, matchesChip, shouldFill } from '@/app/lib/filters';
+import { useEffect, useMemo } from 'react';
+import type { MessageDTO } from '@/app/services/types';
+import { chipKey, chipLabel } from '@/app/lib/filters';
 import { relativeTime } from '@/app/lib/format';
 import { loadDrafts, useDrafts } from '@/state/drafts';
-import { useInboxUi, useLoadedMessages } from '@/state/inboxUi';
-import { loadInbox, loadMore, useStore } from '@/state/store';
+import { useInboxUi } from '@/state/inboxUi';
+import { loadList, loadMoreOf, useStore } from '@/state/store';
 import { DraftsView } from '@/app/components/drafts';
 import { SearchView } from '@/app/components/search';
 import { MessageList } from '@/app/components/inbox/MessageList';
@@ -24,47 +25,35 @@ import { useNearEnd } from '@/app/components/inbox/useNearEnd';
  */
 export function InboxView({ covered }: { covered: boolean }) {
   const s = useStore();
-  const { inbox } = s;
   const { chip, searchText, searchActive, setSearchText, exitSearch, menuOpen, setMenuOpen } = useInboxUi();
-  const [fillPages, setFillPages] = useState(0);
-  const fillAbort = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (inbox.state === 'idle') {
-      void loadInbox();
-    }
-  }, [inbox.state]);
-
   const drafts = useDrafts();
   const showingDrafts = chip.kind === 'drafts';
-  const { loaded } = useLoadedMessages();
-  const visible = useMemo(() => loaded.filter((m) => matchesChip(m, chip)), [loaded, chip]);
-  const selection = useListSelection(visible);
-  const filling = !showingDrafts && inbox.state === 'ready' && shouldFill(visible.length, fillPages, inbox.nextCursor) && !inbox.moreError;
-  const lookFurther = !showingDrafts && inbox.state === 'ready' && fillPages >= 5 && visible.length < 25 && inbox.nextCursor !== null;
+  const list = s.list(chip);
 
-  // Switching labels cancels a fill in progress and starts counting again (§4).
+  // Each label has its own server-filtered list (§4). Choosing one shows what it already holds
+  // and refreshes it; a label not loaded yet loads its first page.
   const key = chipKey(chip);
   useEffect(() => {
-    fillAbort.current?.abort();
-    setFillPages(0);
-  }, [key]);
-
-  // A label with too few loaded matches keeps paging (§4 User actions).
-  useEffect(() => {
-    if (!filling || inbox.loadingMore) {
+    if (chip.kind === 'drafts') {
       return;
     }
-    const controller = new AbortController();
-    fillAbort.current = controller;
-    void loadMore(controller.signal).then(() => !controller.signal.aborted && setFillPages((n) => n + 1));
-  }, [filling, inbox.loadingMore]);
+    // A quiet refresh: only the Refresh button or pull to refresh reports a failure.
+    void loadList(chip);
+    // `chip` is identified by its key: a new object for the same label must not reload it.
+  }, [key]);
+
+  const version = s.getVersion();
+  const visible = useMemo(
+    () => list.ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined),
+    [list.ids, version, s],
+  );
+  const selection = useListSelection(visible);
 
   const sentinel = useNearEnd(() => {
-    if (!filling && !lookFurther && !inbox.moreError) {
-      void loadMore();
+    if (!list.moreError) {
+      void loadMoreOf(chip);
     }
-  }, inbox.state === 'ready' && inbox.nextCursor !== null && !searchActive && !showingDrafts);
+  }, list.state === 'ready' && list.nextCursor !== null && !searchActive && !showingDrafts);
 
   const query = searchText.trim();
 
@@ -74,15 +63,15 @@ export function InboxView({ covered }: { covered: boolean }) {
         value={searchText}
         searching={searchActive}
         covered={covered}
-        refreshing={showingDrafts ? drafts.refreshing : inbox.refreshing}
+        refreshing={showingDrafts ? drafts.refreshing : list.refreshing}
         refreshDisabled={
-          showingDrafts ? drafts.refreshing || drafts.state === 'loading' : inbox.refreshing || inbox.state === 'loading'
+          showingDrafts ? drafts.refreshing || drafts.state === 'loading' : list.refreshing || list.state === 'loading'
         }
         menuOpen={menuOpen}
         onMenu={() => setMenuOpen(true)}
         onChange={setSearchText}
         onCancel={exitSearch}
-        onRefresh={() => void (showingDrafts ? loadDrafts({ refresh: true }) : loadInbox({ refresh: true }))}
+        onRefresh={() => void (showingDrafts ? loadDrafts({ refresh: true }) : loadList(chip, { refresh: true }))}
       />
 
       {searchActive && query.length >= MIN_QUERY ? (
@@ -103,25 +92,22 @@ export function InboxView({ covered }: { covered: boolean }) {
               {visible.length > 0 && <SelectBox state="none" label="Select all" onToggle={() => selection.selectAll(true)} />}
               <h1 className="list-title">{chipLabel(chip)}</h1>
               <p className="synced" aria-live="polite">
-                {inbox.state === 'ready' &&
-                  (inbox.lastSyncedAt ? `Synced ${relativeTime(inbox.lastSyncedAt)}` : 'Syncing your mailbox…')}
+                {list.state === 'ready' &&
+                  (list.lastSyncedAt ? `Synced ${relativeTime(list.lastSyncedAt)}` : 'Syncing your mailbox…')}
               </p>
             </div>
           )}
           <MessageList
-            inbox={inbox}
-            loadedCount={loaded.length}
+            list={list}
+            loadedCount={s.all().length}
             visible={visible}
             selection={{ order: selection.order, selecting: selection.selecting }}
             chip={chip}
             pending={s.pending}
-            filling={filling}
-            lookFurther={lookFurther}
             sentinel={sentinel}
-            onRetry={() => void loadInbox()}
-            onRefresh={() => void loadInbox({ refresh: true })}
-            onLoadMore={() => void loadMore()}
-            onLookFurther={() => setFillPages(0)}
+            onRetry={() => void loadList(chip)}
+            onRefresh={() => void loadList(chip, { refresh: true })}
+            onLoadMore={() => void loadMoreOf(chip)}
           />
         </>
       )}

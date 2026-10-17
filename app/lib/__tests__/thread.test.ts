@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initials, isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '@/app/lib/thread';
+import { bodyKind, gmailThreadUrl, initials, isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '@/app/lib/thread';
 import { message } from '@/app/lib/__tests__/fixtures';
 
 describe('thread view helpers (DESIGN_SPEC.md §2)', () => {
@@ -67,5 +67,20 @@ describe('conversation trash and restore (DESIGN_SPEC.md §2)', () => {
     expect(moveTargets('archive', all).map((m) => m.gmailId)).toEqual(['i']);
     expect(moveTargets('trash', all).map((m) => m.gmailId)).toEqual(['i', 's']);
     expect(moveTargets('restore', all).map((m) => m.gmailId)).toEqual(['t']);
+  });
+});
+
+describe('message body and Gmail link (DESIGN_SPEC.md §2)', () => {
+  it('shows bodyPlain first, bodyHtml only when there is no plain text, else the snippet', () => {
+    expect(bodyKind({ bodyPlain: 'hi', bodyHtml: '<p>hi</p>' })).toBe('plain');
+    expect(bodyKind({ bodyPlain: null, bodyHtml: '<p>x</p>' })).toBe('html');
+    expect(bodyKind({ bodyPlain: '  \n', bodyHtml: '<p>x</p>' })).toBe('html');
+    expect(bodyKind({ bodyPlain: '', bodyHtml: null })).toBe('snippet');
+    expect(bodyKind({ bodyPlain: null, bodyHtml: '   ' })).toBe('snippet');
+  });
+
+  it('links the thread to Gmail for the signed-in account', () => {
+    expect(gmailThreadUrl('18c2f0a1b2', 'you@example.com')).toBe('https://mail.google.com/mail/?authuser=you%40example.com#all/18c2f0a1b2');
+    expect(gmailThreadUrl('18c2f0a1b2', null)).toBe('https://mail.google.com/mail/#all/18c2f0a1b2');
   });
 });

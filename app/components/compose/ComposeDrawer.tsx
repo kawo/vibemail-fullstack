@@ -12,6 +12,7 @@ import {
   splitQuote,
   splitRecipients,
   validateForSend,
+  wasSent,
 } from '@/app/lib/compose';
 import {
   type DraftSnapshot,
@@ -50,7 +51,7 @@ interface Initial {
 }
 
 /** Whether VibeMail has stored a message in this thread (a listed draft is then a reply). */
-const hasStoredThread = (threadId: string): boolean => store.inbox.ids.some((id) => store.get(id)?.threadId === threadId);
+const hasStoredThread = (threadId: string): boolean => store.hasThread(threadId);
 
 function initialState(opening: ComposeOpening): Initial {
   switch (opening.mode) {
@@ -361,11 +362,17 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
         body: current.body,
         ...(current.threadId ? { threadId: current.threadId } : {}),
       });
-      store.addToInbox(message);
+      // Cached, and placed in every loaded list it belongs to (All, as a sent message).
+      store.upsert(message);
       afterSent('Sent');
     } catch (error) {
       setSending(false);
       const apiError = error instanceof ApiError ? error : asApiError(error);
+      if (wasSent(apiError)) {
+        // Gmail sent it; only the follow-up failed. Never resend (CONTRACT.md §4.3).
+        afterSent('Sent. It may take a moment to appear');
+        return;
+      }
       switch (apiError.code) {
         case 'UNAUTHENTICATED':
         case 'GMAIL_NOT_CONNECTED':
@@ -384,12 +391,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
           setNow(Date.now());
           return;
         default:
-          if (typeof apiError.details?.sentGmailId === 'string') {
-            // It *was* sent: never resend.
-            afterSent('Sent. It may take a moment to appear');
-            return;
-          }
-          setProblem({ kind: 'banner', text: 'Couldn’t send', retry: true });
+          setProblem({ kind: 'banner', text: 'Couldn’t send', retry: apiError.canRetry });
       }
     }
   };

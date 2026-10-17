@@ -7,6 +7,7 @@ import {
   replySubject,
   splitRecipients,
   validateForSend,
+  wasSent,
 } from '@/app/lib/compose';
 import { message } from '@/app/lib/__tests__/fixtures';
 
@@ -58,5 +59,15 @@ describe('compose rules (DESIGN_SPEC.md §3)', () => {
 
   it('splits typed recipients', () => {
     expect(splitRecipients('a@b.co, c@d.co;\n e@f.co ')).toEqual(['a@b.co', 'c@d.co', 'e@f.co']);
+  });
+});
+
+describe('send outcome (CONTRACT.md §4.3)', () => {
+  it('treats any error that carries sentGmailId as sent, so it is never resent', () => {
+    expect(wasSent({ code: 'GMAIL_UPSTREAM_ERROR', details: { sentGmailId: 'g1' } })).toBe(true);
+    expect(wasSent({ code: 'INTERNAL', details: { sentGmailId: 'g1' } })).toBe(true);
+    expect(wasSent({ code: 'GMAIL_RATE_LIMITED', details: { sentGmailId: 'g1' } })).toBe(true);
+    expect(wasSent({ code: 'GMAIL_UPSTREAM_ERROR', details: {} })).toBe(false);
+    expect(wasSent({ code: 'INTERNAL' })).toBe(false);
   });
 });

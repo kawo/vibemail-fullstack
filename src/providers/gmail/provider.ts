@@ -1,7 +1,9 @@
 import {
   type AccountCredentials,
   type ChangePage,
+  type DraftPage,
   type DraftResult,
+  type ListedDraft,
   type MailProvider,
   type MailProviderFactory,
   type OnTokens,
@@ -36,6 +38,9 @@ export const GMAIL_SENT_LABEL = 'SENT';
 export const GMAIL_TRASH_LABEL = 'TRASH';
 export const GMAIL_SPAM_LABEL = 'SPAM';
 export const GMAIL_DRAFT_LABEL = 'DRAFT';
+
+/** CONTRACT.md §4.13: at most 10 `drafts.get` calls in flight. */
+const DRAFT_GET_CONCURRENCY = 10;
 
 /** Gmail history IDs are unsigned 64-bit integers with gaps; compare them as BigInt. */
 export function compareHistoryIds(a: SyncCursor, b: SyncCursor): -1 | 0 | 1 {
@@ -242,6 +247,51 @@ export class GmailMailProvider implements MailProvider {
 
   async deleteDraft(draftId: string): Promise<void> {
     await this.call('drafts.delete', () => this.gmail.users.drafts.delete({ userId: 'me', id: draftId }));
+  }
+
+  /**
+   * `drafts.list`, then `drafts.get` (`format: 'full'`) for each listed draft, at most 10 at a time
+   * (CONTRACT.md §4.13). A draft that 404s on `get` was deleted in between and is skipped.
+   */
+  async listDrafts(options: { limit: number; pageToken: string | null }): Promise<DraftPage> {
+    const { data } = await this.call('drafts.list', () =>
+      this.gmail.users.drafts.list({
+        userId: 'me',
+        maxResults: options.limit,
+        ...(options.pageToken ? { pageToken: options.pageToken } : {}),
+      }),
+    );
+    const ids = (data.drafts ?? []).map((d) => d.id).filter((id): id is string => typeof id === 'string');
+    const drafts: ListedDraft[] = [];
+    for (let at = 0; at < ids.length; at += DRAFT_GET_CONCURRENCY) {
+      const batch = await Promise.all(ids.slice(at, at + DRAFT_GET_CONCURRENCY).map((id) => this.getListedDraft(id)));
+      drafts.push(...batch.filter((d): d is ListedDraft => d !== null));
+    }
+    return { drafts, nextPageToken: data.nextPageToken ?? null };
+  }
+
+  private async getListedDraft(id: string): Promise<ListedDraft | null> {
+    let data: gmail_v1.Schema$Draft;
+    try {
+      ({ data } = await this.call('drafts.get', () => this.gmail.users.drafts.get({ userId: 'me', id, format: 'full' })));
+    } catch (error) {
+      if (error instanceof ProviderError && error.kind === 'not_found') {
+        return null;
+      }
+      throw error;
+    }
+    if (!data.message) {
+      throw new ProviderError('upstream', 'drafts.get response lacks the message');
+    }
+    const ids = GmailMailProvider.draftResult(data, 'drafts.get');
+    const message = parseGmailMessage(data.message);
+    return {
+      ...ids,
+      to: message.to,
+      subject: message.subject ?? '',
+      body: message.bodyText ?? '',
+      updatedAt: message.receivedAt,
+    };
   }
 
   async watch(): Promise<WatchResult> {

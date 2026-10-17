@@ -39,10 +39,10 @@ Sync is **push-driven**. Gmail is read once at connect time (a full sync of the 
 ## Project layout
 
 ```
-api/                 Vercel function entry points (thin wrappers)
+api/                 engine handlers (thin wrappers), served through app/api/** route re-exports
   v1/auth/google/    OAuth start and callback
   v1/messages/       list, send, mark-as-read
-  webhook/gmail.ts   Pub/Sub push receiver (public path /webhook/gmail via rewrite)
+  webhook/gmail.ts   Pub/Sub push receiver (served at /webhook/gmail by app/webhook/gmail/route.ts)
   cron/              watch renewal
 src/
   config/            environment loading
@@ -62,26 +62,26 @@ tests/integration/   tests against a real dev/test Supabase project
 
 ## Frontend
 
-**VibeMail Glass**, the web client, is a Next.js 15 (App Router) + React 19 app at the repo root, beside the engine. It implements [`docs/design-system/DESIGN_SPEC.md`](docs/design-system/DESIGN_SPEC.md) and talks to the engine only over [`CONTRACT.md`](CONTRACT.md) §4.
+**VibeMail Glass**, the web client, is a Next.js 15 (App Router) + React 19 app at the repo root, beside the engine. It implements [`docs/design-system/DESIGN_SPEC.md`](docs/design-system/DESIGN_SPEC.md) and talks to the engine only over [`CONTRACT.md`](CONTRACT.md) §4. One Next.js project serves both on one origin: the client calls `/api/v1/...` by relative path, with the bearer from the Supabase session kept in `localStorage`.
 
 ```
 app/                 routes: auth/, auth/callback/, (mail)/inbox, (mail)/thread/[threadId]
+  api/  webhook/     route files that re-export the engine's api/ handlers
   components/        UI: MessageRow (inbox, search, thread), ComposeDrawer (mode prop), sidebar, settings
   lib/               pure logic and its Vitest tests
-  services/          data layer: DataSource, sampleSource (Phase 1), httpSource (Phase 2)
+  services/          data layer: DataSource, served by httpSource
   styles/            glass CSS and design-system tokens (dark, light, text scale)
-state/               client stores
-data/data.js         sample data for Phase 1 (kept intact)
+state/               client stores (one server-filtered list per label)
 ```
 
 ```bash
 npm install
-npm run web:dev      # http://localhost:3001, sample data by default
+npm run web:dev      # http://localhost:3001: the web client and every engine endpoint
 npm run web:test     # Vitest
 npm run web:build    # next build (type-checks with tsconfig.next.json)
 ```
 
-Set `NEXT_PUBLIC_DATA_SOURCE=api` and the other `NEXT_PUBLIC_*` values in `.env` to use the engine instead of the sample data, and set the engine's `FRONTEND_URL` to the client's origin. Deployment is not set up yet; see the "Web client" section of [`CLAUDE.md`](CLAUDE.md).
+Signing in needs the engine's variables in `.env` (below), with `FRONTEND_URL=http://localhost:3001` and `GOOGLE_REDIRECT_URI=http://localhost:3001/api/v1/auth/google/callback` (registered on the Google OAuth client), plus `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for the client's session.
 
 ## Getting started
 
@@ -122,7 +122,7 @@ To generate a key:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-npm blocks the install scripts of `esbuild`, `unrs-resolver` and `@parcel/watcher`. If `vercel dev` or Jest fails to resolve modules, check them:
+npm blocks the install scripts of `esbuild`, `unrs-resolver` and `@parcel/watcher`. If Next.js or Jest fails to resolve modules, check them:
 
 ```bash
 npm install-scripts ls
@@ -131,10 +131,10 @@ npm install-scripts ls
 ### Run locally
 
 ```bash
-npm run dev
+npm run web:dev
 ```
 
-This runs `vercel dev`. Vercel runs cron jobs only in production, so trigger the renewal by hand with `vercel crons run /api/cron/renew-watch`, or send the bearer header yourself.
+This runs `next dev` on port 3001, serving the web client and every engine endpoint. Vercel runs cron jobs only in production, so trigger the renewal by hand by sending `Authorization: Bearer <CRON_SECRET>` to `/api/cron/renew-watch`.
 
 ## Testing and type-checking
 
@@ -149,7 +149,7 @@ npm run typecheck
 - `npm test` runs `jest --ci --runInBand`. `--runInBand` is required because the integration tests share one database.
 - **Integration tests** (`npx jest tests/integration`) run against the dev/test Supabase project in `.env`, never production. They create and delete `@vibemail.test` users, and they need the migrations applied to that project.
 - **Passing** means `numFailedTests`, `numPendingTests` and `numTodoTests` are all 0 in `--json` output. A leftover `.only` shows up as pending tests.
-- **Type-checking** always goes through `tsconfig.check.json`. Never run bare `tsc`: the base `tsconfig.json` fails with TS6059 by design, and Vercel compiles `api/` itself.
+- **Type-checking** always goes through `tsconfig.check.json`. Never run bare `tsc`: the base `tsconfig.json` fails with TS6059 by design, and Next.js compiles `api/` through the route re-exports.
 
 ## Database
 
@@ -167,7 +167,7 @@ npm run db:push
 
 ## Deployment
 
-The project deploys to Vercel. [`vercel.json`](vercel.json) holds the `/webhook/gmail` rewrite, the daily cron (`0 6 * * *`) and per-function `maxDuration`. Set every variable above in the Vercel project.
+The project deploys to Vercel as one Next.js project: the web client and every engine endpoint (through the route re-exports, which also set each function's `maxDuration`). [`vercel.json`](vercel.json) holds the build command and the daily cron (`0 6 * * *`). Set every variable above in the Vercel project, with `FRONTEND_URL` and the `GOOGLE_REDIRECT_URI` origin set to the deployment's own origin.
 
 With the Supabase GitHub integration, merging into `main` runs migrations on production.
 

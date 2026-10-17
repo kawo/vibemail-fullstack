@@ -39,8 +39,6 @@
     "app/**/*.tsx",
     "state/**/*.ts",
     "state/**/*.tsx",
-    "data/**/*.ts",
-    "data/**/*.js",
     ".next/types/**/*.ts"
   ],
   "exclude": [

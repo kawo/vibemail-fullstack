@@ -1,26 +1,18 @@
 import { useSyncExternalStore } from 'react';
 import { ApiError, api, isAbort } from '@/app/services';
 import type { MessageDTO } from '@/app/services/types';
+import { type Chip, chipKey, chipParam } from '@/app/lib/filters';
+import { type ListState, emptyList, placeInLists } from '@/app/lib/lists';
+
+export type { ListState, LoadState } from '@/app/lib/lists';
 
 /**
  * One client-side cache of `MessageDTO`s keyed by `gmailId`, shared by every view
- * (DESIGN_SPEC.md shared rules). Any response that returns a message replaces the cached entry,
- * so `labelIds`, `status`, `isRead` and `isStarred` always come from the server.
+ * (DESIGN_SPEC.md shared rules), and one server-filtered list per label (CONTRACT.md §4.2
+ * `label`, v1.2). Any response that returns a message replaces the cached entry, so `labelIds`,
+ * `status`, `isRead` and `isStarred` always come from the server, and the message moves between
+ * the loaded lists it now does or doesn't belong to.
  */
-
-export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
-
-export interface InboxState {
-  /** Server order: `internalDate` descending. */
-  ids: string[];
-  nextCursor: string | null;
-  lastSyncedAt: string | null;
-  state: LoadState;
-  error: ApiError | null;
-  loadingMore: boolean;
-  moreError: ApiError | null;
-  refreshing: boolean;
-}
 
 export interface Toast {
   id: number;
@@ -36,16 +28,9 @@ class Store {
   private readonly overrides = new Map<string, Partial<MessageDTO>>();
   /** Messages with a label change in flight: dimmed and not swipeable. */
   readonly pending = new Set<string>();
-  inbox: InboxState = {
-    ids: [],
-    nextCursor: null,
-    lastSyncedAt: null,
-    state: 'idle',
-    error: null,
-    loadingMore: false,
-    moreError: null,
-    refreshing: false,
-  };
+  /** One list per label, keyed by `chipKey`; `chips` remembers which label each key is. */
+  private lists = new Map<string, ListState>();
+  private readonly chips = new Map<string, Chip>();
   toasts: Toast[] = [];
   private version = 0;
   private readonly listeners = new Set<() => void>();
@@ -71,12 +56,41 @@ class Store {
     return message && override ? { ...message, ...override } : message;
   }
 
-  upsert(message: MessageDTO): void {
-    this.messages.set(message.gmailId, message);
-    this.overrides.delete(message.gmailId);
+  /** Every cached message, whichever list, search or thread loaded it (for counts and labels). */
+  all(): MessageDTO[] {
+    return [...this.messages.keys()].map((id) => this.get(id)).filter((m): m is MessageDTO => m !== undefined);
+  }
+
+  /** Whether any cached message belongs to `threadId`. */
+  hasThread(threadId: string): boolean {
+    for (const message of this.messages.values()) {
+      if (message.threadId === threadId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  list(chip: Chip): ListState {
+    return this.lists.get(chipKey(chip)) ?? emptyList();
+  }
+
+  setList(chip: Chip, patch: Partial<ListState>): void {
+    const key = chipKey(chip);
+    this.chips.set(key, chip);
+    this.lists = new Map(this.lists).set(key, { ...this.list(chip), ...patch });
     this.changed();
   }
 
+  /** A message returned by the server: cached, and moved into or out of every loaded list. */
+  upsert(message: MessageDTO): void {
+    this.messages.set(message.gmailId, message);
+    this.overrides.delete(message.gmailId);
+    this.lists = placeInLists(this.lists, [...this.chips.values()], message, this.messages);
+    this.changed();
+  }
+
+  /** A page of messages; the caller sets the list they belong to. */
   upsertMany(messages: readonly MessageDTO[]): void {
     for (const message of messages) {
       this.messages.set(message.gmailId, message);
@@ -87,7 +101,11 @@ class Store {
   remove(gmailId: string): void {
     this.messages.delete(gmailId);
     this.overrides.delete(gmailId);
-    this.inbox = { ...this.inbox, ids: this.inbox.ids.filter((id) => id !== gmailId) };
+    const next = new Map<string, ListState>();
+    for (const [key, list] of this.lists) {
+      next.set(key, list.ids.includes(gmailId) ? { ...list, ids: list.ids.filter((id) => id !== gmailId) } : list);
+    }
+    this.lists = next;
     this.changed();
   }
 
@@ -109,26 +127,6 @@ class Store {
     this.changed();
   }
 
-  /** Inserts a message (e.g. one just sent) into the inbox list at its date position. */
-  addToInbox(message: MessageDTO): void {
-    this.messages.set(message.gmailId, message);
-    if (!this.inbox.ids.includes(message.gmailId)) {
-      const ids = [...this.inbox.ids];
-      const at = ids.findIndex((id) => {
-        const other = this.messages.get(id);
-        return other !== undefined && other.internalDate < message.internalDate;
-      });
-      ids.splice(at === -1 ? ids.length : at, 0, message.gmailId);
-      this.inbox = { ...this.inbox, ids };
-    }
-    this.changed();
-  }
-
-  setInbox(patch: Partial<InboxState>): void {
-    this.inbox = { ...this.inbox, ...patch };
-    this.changed();
-  }
-
   toast(text: string, options: { action?: Toast['action']; ttl?: number } = {}): void {
     this.toastSeq += 1;
     const toast: Toast = { id: this.toastSeq, text, ttl: options.ttl ?? 4000, ...(options.action ? { action: options.action } : {}) };
@@ -146,7 +144,8 @@ class Store {
     this.messages.clear();
     this.overrides.clear();
     this.pending.clear();
-    this.inbox = { ids: [], nextCursor: null, lastSyncedAt: null, state: 'idle', error: null, loadingMore: false, moreError: null, refreshing: false };
+    this.lists = new Map();
+    this.chips.clear();
     this.changed();
   }
 }
@@ -162,13 +161,30 @@ export function useStore(): Store {
 const asApiError = (error: unknown): ApiError =>
   error instanceof ApiError ? error : new ApiError(0, { code: 'INTERNAL', message: String(error), retryable: false });
 
-/** First page, or a refresh (`GET /api/v1/messages` with no cursor). Never calls Gmail. */
-export async function loadInbox(options: { refresh?: boolean } = {}): Promise<void> {
-  store.setInbox(options.refresh ? { refreshing: true } : { state: 'loading', error: null });
+/**
+ * Each label's load generation. A first-page load (or refresh) starts a new one; a response from
+ * an older generation is dropped, so a page fetched with a cursor a refresh has replaced, or a
+ * slower earlier load of the same label, never lands on top of newer data.
+ */
+const generations = new Map<string, number>();
+const generationOf = (chip: Chip): number => generations.get(chipKey(chip)) ?? 0;
+
+/**
+ * First page of a label's list, or a refresh (`GET /api/v1/messages?label=…`, no cursor). A list
+ * that already has messages keeps showing them while it refreshes. Never calls Gmail.
+ */
+export async function loadList(chip: Chip, options: { refresh?: boolean } = {}): Promise<void> {
+  const generation = generationOf(chip) + 1;
+  generations.set(chipKey(chip), generation);
+  const shown = store.list(chip).state === 'ready';
+  store.setList(chip, shown ? { refreshing: true, loadingMore: false } : { state: 'loading', error: null, loadingMore: false });
   try {
-    const page = await api.listMessages();
+    const page = await api.listMessages(chipParam(chip));
+    if (generationOf(chip) !== generation) {
+      return; // A newer load of this label owns the list now.
+    }
     store.upsertMany(page.messages);
-    store.setInbox({
+    store.setList(chip, {
       ids: page.messages.map((m) => m.gmailId),
       nextCursor: page.nextCursor,
       lastSyncedAt: page.lastSyncedAt,
@@ -178,47 +194,54 @@ export async function loadInbox(options: { refresh?: boolean } = {}): Promise<vo
       refreshing: false,
     });
   } catch (error) {
+    if (generationOf(chip) !== generation) {
+      return;
+    }
     const apiError = asApiError(error);
-    store.setInbox(
-      options.refresh && store.inbox.state === 'ready'
-        ? { refreshing: false }
-        : { state: 'error', error: apiError, refreshing: false },
-    );
-    if (options.refresh) {
+    store.setList(chip, shown ? { refreshing: false } : { state: 'error', error: apiError, refreshing: false });
+    if (shown && options.refresh) {
       store.toast('Couldn’t refresh your mail');
     }
   }
 }
 
-/** Next page with `nextCursor`. A stale cursor (`VALIDATION_FAILED`) silently reloads from the start. */
-export async function loadMore(signal?: AbortSignal): Promise<void> {
-  const { nextCursor, loadingMore } = store.inbox;
-  if (!nextCursor || loadingMore) {
-    return;
+/** Next page of a label's list, with its own cursor and label. A stale cursor (`VALIDATION_FAILED`) silently reloads from the start. */
+export async function loadMoreOf(chip: Chip, signal?: AbortSignal): Promise<void> {
+  const { nextCursor, loadingMore, refreshing } = store.list(chip);
+  if (!nextCursor || loadingMore || refreshing) {
+    return; // A refresh replaces the cursor; paging waits for it.
   }
-  store.setInbox({ loadingMore: true, moreError: null });
+  const generation = generationOf(chip);
+  store.setList(chip, { loadingMore: true, moreError: null });
   try {
-    const page = await api.listMessages(nextCursor, 25, signal);
+    const page = await api.listMessages(chipParam(chip), nextCursor, 25, signal);
+    if (generationOf(chip) !== generation) {
+      return; // Fetched with a cursor a newer load has replaced.
+    }
     store.upsertMany(page.messages);
-    const known = new Set(store.inbox.ids);
-    store.setInbox({
-      ids: [...store.inbox.ids, ...page.messages.map((m) => m.gmailId).filter((id) => !known.has(id))],
+    const current = store.list(chip);
+    const known = new Set(current.ids);
+    store.setList(chip, {
+      ids: [...current.ids, ...page.messages.map((m) => m.gmailId).filter((id) => !known.has(id))],
       nextCursor: page.nextCursor,
       lastSyncedAt: page.lastSyncedAt,
       loadingMore: false,
     });
   } catch (error) {
+    if (generationOf(chip) !== generation) {
+      return; // A newer load owns the list; this page's failure no longer matters.
+    }
     if (isAbort(error)) {
-      store.setInbox({ loadingMore: false });
+      store.setList(chip, { loadingMore: false });
       return;
     }
     const apiError = asApiError(error);
-    store.setInbox({ loadingMore: false });
+    store.setList(chip, { loadingMore: false });
     if (apiError.code === 'VALIDATION_FAILED') {
-      await loadInbox();
+      await loadList(chip);
       return;
     }
-    store.setInbox({ moreError: apiError });
+    store.setList(chip, { moreError: apiError });
   }
 }
 

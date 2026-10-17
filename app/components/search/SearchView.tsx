@@ -23,6 +23,7 @@ export function SearchView({ query }: { query: string }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(false);
+  const [moreCanRetry, setMoreCanRetry] = useState(true);
   const [hint, setHint] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const terms = query.split(/\s+/).filter(Boolean);
@@ -58,6 +59,7 @@ export function SearchView({ query }: { query: string }) {
       }
       if (after) {
         setMoreError(true);
+        setMoreCanRetry(apiError.canRetry);
       } else {
         setError(apiError);
         setState('error');
@@ -113,9 +115,12 @@ export function SearchView({ query }: { query: string }) {
       <Panel
         title="Search isn’t working right now"
         action={
-          <button type="button" className="secondary-btn" onClick={() => (setState('loading'), void run(query, null))}>
-            Retry
-          </button>
+          // Retry only when it can help: `retryable`, or INTERNAL (DESIGN_SPEC.md shared rules).
+          error?.canRetry ? (
+            <button type="button" className="secondary-btn" onClick={() => (setState('loading'), void run(query, null))}>
+              Retry
+            </button>
+          ) : undefined
         }
       />
     );
@@ -130,7 +135,8 @@ export function SearchView({ query }: { query: string }) {
           pending={s.pending}
           loadingMore={loadingMore}
           moreError={moreError}
-          onRetryMore={() => (setMoreError(false), setLoadingMore(true), void run(query, cursor))}
+          // Retry only when it can help: `retryable`, or INTERNAL (DESIGN_SPEC.md shared rules).
+          onRetryMore={moreCanRetry ? () => (setMoreError(false), setLoadingMore(true), void run(query, cursor)) : undefined}
         />
       )}
       <div ref={sentinel} />

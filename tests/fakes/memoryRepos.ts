@@ -1,4 +1,4 @@
-import { type ListCursor, type MessageRow, type MessageWrite, type MessagesRepository, toMessageRow } from '../../src/db/messages';
+import { type ListCursor, type ListFilter, type MessageRow, type MessageWrite, type MessagesRepository, toMessageRow } from '../../src/db/messages';
 import { deriveStatus } from '../../src/db/status';
 import type {
   ConnectedAccount,
@@ -129,8 +129,24 @@ export class MemoryMessages implements MessagesRepository {
       )
       .slice(0, limit);
   }
-  async listMessages(userId: string, limit: number, after: ListCursor | null): Promise<MessageRow[]> {
-    return this.page(this.forUser(userId), limit, after);
+  /** Same predicates as the Supabase repository's `label` filter (CONTRACT.md §4.2). */
+  async listMessages(userId: string, limit: number, after: ListCursor | null, filter: ListFilter): Promise<MessageRow[]> {
+    const live = (r: MessageRow) => r.status !== 'trash' && r.status !== 'spam';
+    const matches = (r: MessageRow): boolean => {
+      switch (filter.kind) {
+        case 'archive':
+          return r.status === 'archived';
+        case 'trash':
+          return r.status === 'trash';
+        case 'starred':
+          return live(r) && r.is_starred;
+        case 'label':
+          return live(r) && r.label_ids.includes(filter.labelId);
+        default:
+          return live(r);
+      }
+    };
+    return this.page(this.forUser(userId).filter(matches), limit, after);
   }
   async listThread(userId: string, threadId: string, limit: number): Promise<MessageRow[]> {
     return this.page(this.forUser(userId).filter((r) => r.thread_id === threadId), limit, null);

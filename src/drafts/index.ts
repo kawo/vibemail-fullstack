@@ -187,3 +187,78 @@ export async function deleteDraft(deps: DraftDeps, userId: string, draftId: stri
     await rethrow(deps, userId, error, { draftId });
   }
 }
+
+export const DEFAULT_DRAFT_LIMIT = 25;
+export const MAX_DRAFT_LIMIT = 50;
+
+export interface ListDraftsResponse {
+  drafts: DraftDTO[];
+  nextCursor: string | null;
+}
+
+/** Opaque draft-list cursor (CONTRACT.md §4.13): `base64url(JSON.stringify({ p: nextPageToken }))`. */
+export function encodeDraftCursor(pageToken: string): string {
+  return Buffer.from(JSON.stringify({ p: pageToken }), 'utf8').toString('base64url');
+}
+
+function decodeDraftCursor(value: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
+  } catch {
+    parsed = null;
+  }
+  const p = (parsed as { p?: unknown } | null)?.p;
+  if (typeof p !== 'string' || p === '') {
+    throw new ApiError('VALIDATION_FAILED', 'invalid cursor', { details: { issues: [{ field: 'cursor', message: 'malformed' }] } });
+  }
+  return p;
+}
+
+export function parseDraftListQuery(url: URL): { limit: number; cursor: string | null; pageToken: string | null } {
+  const rawLimit = url.searchParams.get('limit');
+  let limit = DEFAULT_DRAFT_LIMIT;
+  if (rawLimit !== null) {
+    if (!/^\d+$/.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > MAX_DRAFT_LIMIT) {
+      throw new ApiError('VALIDATION_FAILED', 'invalid limit', {
+        details: { issues: [{ field: 'limit', message: `integer 1..${MAX_DRAFT_LIMIT}` }] },
+      });
+    }
+    limit = Number(rawLimit);
+  }
+  const cursor = url.searchParams.get('cursor');
+  return { limit, cursor, pageToken: cursor === null ? null : decodeDraftCursor(cursor) };
+}
+
+/**
+ * `GET /api/v1/drafts` (CONTRACT.md §4.13): one page of the user's Gmail drafts, newest first.
+ * Drafts aren't stored, so this reads Gmail on every call. A page token Gmail rejects is
+ * `VALIDATION_FAILED` with `details.cursor`.
+ */
+export async function listDrafts(
+  deps: DraftDeps,
+  userId: string,
+  query: { limit: number; cursor: string | null; pageToken: string | null },
+): Promise<ListDraftsResponse> {
+  const provider = await providerForUser(deps, userId);
+  try {
+    const page = await provider.listDrafts({ limit: query.limit, pageToken: query.pageToken });
+    return {
+      drafts: page.drafts.map((d) => ({
+        draftId: d.draftId,
+        gmailId: d.messageId,
+        threadId: d.threadId,
+        to: d.to,
+        subject: d.subject,
+        body: d.body,
+        updatedAt: d.updatedAt.toISOString(),
+      })),
+      nextCursor: page.nextPageToken ? encodeDraftCursor(page.nextPageToken) : null,
+    };
+  } catch (error) {
+    if (error instanceof ProviderError && error.kind === 'invalid_request' && query.cursor !== null) {
+      throw new ApiError('VALIDATION_FAILED', 'invalid cursor', { details: { cursor: query.cursor } });
+    }
+    return rethrow(deps, userId, error, null);
+  }
+}

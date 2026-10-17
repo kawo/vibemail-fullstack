@@ -25,7 +25,7 @@ describe('api/ function files (CONTRACT.md §4)', () => {
     ['labels', labels, ['OPTIONS', 'PATCH']],
     ['search', search, ['GET', 'OPTIONS']],
     ['thread', thread, ['GET', 'OPTIONS']],
-    ['drafts', drafts, ['OPTIONS', 'POST']],
+    ['drafts', drafts, ['GET', 'OPTIONS', 'POST']],
     ['draft', draft, ['DELETE', 'OPTIONS', 'PATCH']],
     ['webhook', webhook, ['POST']],
     ['cron', cron, ['GET']],

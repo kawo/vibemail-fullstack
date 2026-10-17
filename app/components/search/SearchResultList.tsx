@@ -24,7 +24,8 @@ export function SearchResultList({
   pending: ReadonlySet<string>;
   loadingMore: boolean;
   moreError: boolean;
-  onRetryMore: () => void;
+  /** Absent when the error can't be retried: the row then has no Retry. */
+  onRetryMore: (() => void) | undefined;
 }) {
   const selection = useListSelection(results);
   if (results.length === 0) {
@@ -70,10 +71,15 @@ export function SearchResultList({
       )}
       {moreError && (
         <div className="inline-row">
-          Couldn’t load more ·{' '}
-          <button type="button" className="link-btn" onClick={onRetryMore}>
-            Retry
-          </button>
+          Couldn’t load more
+          {onRetryMore && (
+            <>
+              {' · '}
+              <button type="button" className="link-btn" onClick={onRetryMore}>
+                Retry
+              </button>
+            </>
+          )}
         </div>
       )}
     </>

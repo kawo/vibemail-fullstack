@@ -64,9 +64,12 @@ export function DraftsView() {
         <Panel
           title="Couldn’t load your drafts"
           action={
-            <button type="button" className="secondary-btn" onClick={() => void loadDrafts()}>
-              Retry
-            </button>
+            // Retry only when it can help: `retryable`, or INTERNAL (DESIGN_SPEC.md shared rules).
+            drafts.error?.canRetry ? (
+              <button type="button" className="secondary-btn" onClick={() => void loadDrafts()}>
+                Retry
+              </button>
+            ) : undefined
           }
         />
       );
@@ -110,10 +113,15 @@ export function DraftsView() {
           )}
           {drafts.moreError && !drafts.loadingMore && (
             <div className="inline-row">
-              Couldn’t load more ·{' '}
-              <button type="button" className="link-btn" onClick={() => void loadMoreDrafts()}>
-                Retry
-              </button>
+              Couldn’t load more
+              {drafts.moreError.canRetry && (
+                <>
+                  {' · '}
+                  <button type="button" className="link-btn" onClick={() => void loadMoreDrafts()}>
+                    Retry
+                  </button>
+                </>
+              )}
             </div>
           )}
           <div ref={sentinel} />

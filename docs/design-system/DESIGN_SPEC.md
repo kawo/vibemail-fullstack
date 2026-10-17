@@ -116,7 +116,7 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 - `GMAIL_NOT_CONNECTED`, `GMAIL_TOKEN_REVOKED`: the optimistic change is reverted and the reconnect panel opens.
 - `VALIDATION_FAILED`: the change is reverted, with a toast "That change isn't allowed".
 - `MESSAGE_NOT_FOUND`: the row is removed from the cache, with a toast "This message no longer exists".
-- `GMAIL_RATE_LIMITED`: the change is reverted, with a toast "Gmail is busy, try again in {Retry-After}s".
+- `GMAIL_RATE_LIMITED`: the change is reverted, with a toast "Gmail is busy, try again in {Retry-After}s". Until then every message action (star, mark read or unread, archive, trash, restore, alone or in bulk) is refused without a request, with the same toast counting the seconds left.
 - `GMAIL_UPSTREAM_ERROR`, `INTERNAL`: the change is reverted, with a toast "Couldn't update the message" and Retry.
 
 ### Empty state
@@ -130,7 +130,7 @@ For `POST /api/v1/messages/{id}/read` and `PATCH /api/v1/messages/{id}`:
 - **Placement.** From 768px wide, a sidebar on the left holds, top to bottom: the product name, the full-width **Compose** button, the labels as chips (§4), and the account foot. It stays in place while the inbox and threads change beside it. Its right edge resizes it (184–360px; arrow keys when focused; double-click resets), and a toggle in its header collapses it to icons only (56px; names become tooltips, custom labels show a short id like `#12`). Width and mode are remembered on the device. On narrower screens it is a panel that slides in from the left, opened from a menu button in the header; choosing a chip or Compose, tapping outside, or Escape closes it. Phones also keep a floating Compose button. Collapsed to icons only, Compose becomes a 40px icon button with its name as tooltip.
 - **Chips.** Every label is a chip, one per line and the sidebar's full width: a glass pill (`surface-soft` fill, 1px `glass-edge` border, 4px radius) with its icon, name and count. On touch screens each chip is at least 44px tall. Collapsed to icons only, the chips become 40px icon buttons.
 - **Counts.** Every chip shows a right-aligned count of its new mail; a zero shows nothing. Collapsed, the count is a small badge on the icon and joins the tooltip (`Starred · 3`).
-  - **All, Starred, Archive, Trash and custom labels:** how many loaded messages they match, by the filter's rule, that are unread (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening or marking a message read lowers every count it was in; marking it unread raises them.
+  - **All, Starred, Archive, Trash and custom labels:** how many loaded messages (whichever list, search or thread loaded them) meet the label's rule (§4) and are unread (`isRead` is `false`), in bold `ink`, the way unread rows read. Opening or marking a message read lowers every count it was in; marking it unread raises them.
   - **Drafts:** drafts have no unread state, so it counts the drafts listed (§4 Drafts), in `mute`, with a `+` (`25+`) while the list has more pages.
   - Message counts cover only mail VibeMail has synced and loaded (the contract has no count endpoint), so they can grow as the list pages.
 - **Fixed labels.** The sidebar always shows five fixed label chips, in this order: **All**, **Starred**, **Archive**, **Trash**, **Drafts**. They are present even when they match nothing. Drafts is not a filter: it shows the draft list (§4 Drafts).
@@ -165,14 +165,14 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
 ### Default state
 
 - **Placement.** From 1100px wide, the thread opens in a reading pane beside the message list, and the opened row stays highlighted; the header's close control empties the pane. Narrower, the thread replaces the list, sliding in from the right, with a back control.
-- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox. On the right, four icon buttons, each with its name as label and tooltip: the read toggle (`ring` when read, the accent `dot` when unread: "Mark as unread" / "Mark as read"), the conversation star, **Archive conversation** (`archive`; disabled when no message in it is in the inbox) and **Move conversation to trash** (`trash`, `danger-text` on hover). Opened from the Trash label, or when every message in it is trashed, the last button is **Restore conversation to the inbox** (`inbox`) instead. While one runs, a spinner leads them and they are disabled.
+- **Header.** The `subject` of the oldest message in `messages` (or "(no subject)"), with a back control to the inbox. On the right, icon controls, each with its name as label and tooltip: the read toggle (`ring` when read, the accent `dot` when unread: "Mark as unread" / "Mark as read"), the conversation star, **View in Gmail** (`external`; a link that opens `https://mail.google.com/mail/?authuser={account email}#all/{threadId}` in a new tab, with `rel="noopener noreferrer"`), **Archive conversation** (`archive`; disabled when no message in it is in the inbox) and **Move conversation to trash** (`trash`, `danger-text` on hover). Opened from the Trash label, or when every message in it is trashed, the last button is **Restore conversation to the inbox** (`inbox`) instead. While one runs, a spinner leads them and they are disabled.
 - **Message cards.** One glass card per message, oldest first. The newest message is expanded and the earlier ones are collapsed.
   - **Sender:** the display name of `fromAddress` ("You" on sent cards), then its bare address in brackets, quieter (`mute`, 12px): "Lena Ortiz (lena@northwind.example)". The brackets are left out when the name already is the address. A sender line too long for the card ends in an ellipsis, with the address in a tooltip.
   - **Collapsed card:** `fromAddress`, `snippet` and `internalDate`.
   - **Expanded card header:** `fromAddress`, `toAddress`, `ccAddresses` (when non-empty) and `internalDate`.
-  - **Expanded card body:** `bodyHtml` when present, otherwise `bodyPlain`, otherwise `snippet`.
-    - `bodyHtml` is sanitised and rendered in a sandboxed frame with remote images blocked until the user allows them.
+  - **Expanded card body:** `bodyPlain` when it has text, otherwise `bodyHtml`, otherwise `snippet`. Blank or whitespace-only text counts as none.
     - `bodyPlain` is rendered with line breaks preserved.
+    - `bodyHtml` is sanitised and rendered in a frame with `sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"`: no scripts run, links open in a new tab, and remote images stay blocked until the user allows them.
 - **Status badges.** A card whose `status` is `trash`, `spam` or `archived` shows a small badge with that value. A card whose `status` is `sent` is aligned to the right.
 - **Attachments.** Each entry in `attachments` is listed by `filename`, `mimeType` and `size`. The list is informational only: the contract has no attachment download endpoint.
 - **Truncated threads.** When `truncated` is `true`, a frosted banner above the first card reads "Earlier messages in this conversation aren't available in VibeMail".
@@ -318,11 +318,11 @@ For `DELETE /api/v1/drafts/{draftId}`:
 
 ## 4. Label filter
 
-Client-side only: there is no dedicated endpoint. The filter reads the `status`, `isStarred` and `labelIds` fields of messages already loaded from `GET /api/v1/messages` (§4.2). The frontend reads `status` but never sets it.
+Server-side: each label is a list of its own, fetched and paged with `GET /api/v1/messages?label=…` (CONTRACT.md §4.2, *changed in v1.2*). The `label` value is the chip's kind (`all`, `starred`, `archive`, `trash`) or the custom label's ID. The frontend reads `status` but never sets it.
 
 ### Default state
 
-**All** is active. Every label is a chip in the sidebar, one per line (§1 Label sidebar). Each matches messages as follows:
+**All** is active. Every label is a chip in the sidebar, one per line (§1 Label sidebar). The server returns, for each, the messages where:
 
 | Chip | Shows messages where |
 |---|---|
@@ -338,26 +338,26 @@ Client-side only: there is no dedicated endpoint. The filter reads the `status`,
 
 ### User actions
 
-- **Select a chip.** Tapping an inactive chip makes it the only active chip and re-filters the loaded messages instantly.
+- **Select a chip.** Tapping an inactive chip makes it the only active chip. A chip whose list has loaded before shows it at once and refreshes it quietly; a chip never opened loads its first page.
 - **Re-tapping.** Tapping the active chip again scrolls the list to the top.
-- **Filling the first screen.** If fewer than 25 loaded messages match the new chip and `nextCursor` is not `null`, the client keeps requesting `GET /api/v1/messages` with `nextCursor`. It stops at 25 matches, after five extra pages, or when `nextCursor` is `null`. If it stopped after five pages and `nextCursor` is still not `null`, a "Look further" row at the end continues the search.
-- **Cache updates.** A `PATCH /api/v1/messages/{id}` response that changes a message's `status`, `isStarred` or `labelIds` re-evaluates that message against the active chip. It may leave or join the visible results.
+- **Paging.** Each chip's list pages on its own, with its own `nextCursor` and the same `label`, when the user scrolls within one screen of its end (as §1 Load more).
+- **Cache updates.** A response that returns a message (`PATCH`, mark as read, send) moves it between the loaded lists: out of every list whose rule it no longer meets, into every loaded list whose rule it now meets, at its date position. Archiving keeps a message in **All** (All is everything but trash and spam) and adds it to a loaded **Archive**; trashing removes it from All, Starred and its custom labels. A list with more pages to load only takes a message within the range it has loaded; a later page brings older ones.
 
 ### Loading state
 
-While the client fetches extra pages to fill a chip, the matching messages found so far are shown, with an inline "Looking for more…" row at the end. Switching chips during this cancels the pending fill.
+The first page of a chip never opened shows skeleton rows; paging shows the inline spinner row (§1).
 
 ### Error states
 
-The filter makes no request of its own. Pages it fetches through `GET /api/v1/messages` surface that endpoint's states:
+Each chip's pages surface `GET /api/v1/messages`'s states:
 - `UNAUTHENTICATED`: shared rule.
 - `GMAIL_NOT_CONNECTED`: reconnect panel.
-- `VALIDATION_FAILED`: the fill restarts from the first page.
-- `INTERNAL`: the fill stops, with an inline "Couldn't load more · Retry" row.
+- `VALIDATION_FAILED` on a page (a stale cursor): that chip's list reloads from the first page.
+- `INTERNAL`: an inline "Couldn't load more · Retry" row; other non-retryable errors show the row without Retry.
 
 ### Empty state
 
-Shown when no message matches after the fill stopped with `nextCursor` `null`:
+Shown when a chip's list is empty and has no `nextCursor`:
 - **Starred:** "No starred messages."
 - **Archive:** "Nothing in Archive."
 - **Trash:** "Trash is empty."

@@ -14,12 +14,12 @@ import type {
  * Everything the UI asks of the engine: one method per CONTRACT.md §4 endpoint it uses, with the
  * contract's request and response shapes. Components and state only ever talk to this.
  *
- * Phase 1 serves it from the sample data (sampleSource.ts); Phase 2 from the engine over HTTP
- * (httpSource.ts). Both throw `ApiError` with a §3.3 code on failure.
+ * httpSource.ts serves it from the engine over relative paths, and throws `ApiError` with a §3.3
+ * code on failure.
  */
 export interface DataSource {
-  /** §4.2 `GET /api/v1/messages` */
-  listMessages(cursor?: string, limit?: number, signal?: AbortSignal): Promise<ListMessagesResponse>;
+  /** §4.2 `GET /api/v1/messages`, filtered by `label` (v1.2: all, starred, archive, trash or a Label_ ID). */
+  listMessages(label: string, cursor?: string, limit?: number, signal?: AbortSignal): Promise<ListMessagesResponse>;
   /** §4.4 `POST /api/v1/messages/{id}/read` */
   markRead(gmailId: string): Promise<{ message: MessageDTO }>;
   /** §4.7 `PATCH /api/v1/messages/{id}` */

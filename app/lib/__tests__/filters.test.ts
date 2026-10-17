@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_CHIPS, type Chip, FIXED_CHIPS, chipFromParam, inboxQuery, chipCounts, chipLabel, countNoun, countText, customLabelIds, matchesChip, shouldFill, showsCount } from '@/app/lib/filters';
+import { BAR_CHIPS, type Chip, FIXED_CHIPS, chipFromParam, inboxQuery, chipCounts, chipLabel, countNoun, countText, customLabelIds, matchesChip, showsCount } from '@/app/lib/filters';
 import { message } from '@/app/lib/__tests__/fixtures';
 
 describe('label filter (DESIGN_SPEC.md §4)', () => {
@@ -82,13 +82,6 @@ describe('label filter (DESIGN_SPEC.md §4)', () => {
   it('lists custom labels (Label_*) from loaded messages, sorted, and shows the ID', () => {
     expect(customLabelIds(all)).toEqual(['Label_1', 'Label_2']);
     expect(chipLabel({ kind: 'label', labelId: 'Label_2' })).toBe('Label_2');
-  });
-
-  it('fills until 25 matches, five extra pages, or no cursor', () => {
-    expect(shouldFill(3, 0, 'c')).toBe(true);
-    expect(shouldFill(25, 0, 'c')).toBe(false);
-    expect(shouldFill(3, 5, 'c')).toBe(false);
-    expect(shouldFill(3, 0, null)).toBe(false);
   });
 
   it('round-trips a label through ?label= and builds the inbox query', () => {

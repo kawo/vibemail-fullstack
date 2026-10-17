@@ -1,15 +1,11 @@
 import { GoTrueClient } from '@supabase/auth-js';
-import { SAMPLE_ACCOUNT } from '@/data/data';
-import { API_URL, DATA_SOURCE, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/app/lib/config';
-import { type CallbackResult, type CallbackTokens, jwtClaims, parseCallback } from './callback';
-
-export { API_URL };
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/app/lib/config';
+import { type CallbackResult, type CallbackTokens, parseCallback } from './callback';
 
 /**
- * The signed-in session. With the engine (`api`), it is the Supabase session the sign-in
- * callback hands over (CONTRACT.md §4.1b), kept and refreshed by the Supabase auth client; the
- * engine verifies the access token itself. With the sample data, it is a local stand-in with
- * the same shape, so the sign-in, callback and guard run without a backend.
+ * The signed-in session: the Supabase session the sign-in callback hands over (CONTRACT.md
+ * §4.1b), kept in localStorage and refreshed by the Supabase auth client. Every API call reads
+ * its access token as the JWT bearer; the engine verifies it itself (§3.1).
  */
 export interface AppSession {
   accessToken: string;
@@ -17,13 +13,22 @@ export interface AppSession {
 }
 
 let client: GoTrueClient | null = null;
+let warned = false;
 
-/** Only Supabase Auth is needed (keep, refresh, sign out), so this uses the standalone client. */
-function supabase(): GoTrueClient {
-  if (!client) {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set (see app/.env.example).');
+/**
+ * Only Supabase Auth is needed (keep, refresh, sign out), so this uses the standalone client.
+ * Null when NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing: there is then
+ * no session, and the sign-in callback reports the failure instead of the app crashing.
+ */
+function supabase(): GoTrueClient | null {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!warned) {
+      warned = true; // Once per page: every session read would otherwise repeat it.
+      console.error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set (see .env.example).');
     }
+    return null;
+  }
+  if (!client) {
     client = new GoTrueClient({
       url: `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1`,
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
@@ -35,38 +40,6 @@ function supabase(): GoTrueClient {
     });
   }
   return client;
-}
-
-// ---- Sample mode: the session is the token from the callback URL, kept in localStorage. ----
-
-const SAMPLE_KEY = 'vibemail.sample.session';
-
-function readSample(): AppSession | null {
-  try {
-    const raw = window.localStorage.getItem(SAMPLE_KEY);
-    const value = raw ? (JSON.parse(raw) as Partial<AppSession>) : null;
-    return value && typeof value.accessToken === 'string' ? { accessToken: value.accessToken, email: value.email ?? null } : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeSample(session: AppSession | null): void {
-  try {
-    if (session) {
-      window.localStorage.setItem(SAMPLE_KEY, JSON.stringify(session));
-    } else {
-      window.localStorage.removeItem(SAMPLE_KEY);
-    }
-  } catch {
-    // Storage unavailable: the session lasts for this page only.
-  }
-}
-
-/** An unsigned JWT-shaped token for sample mode; nothing verifies it, the app only reads its claims. */
-function sampleToken(): string {
-  const encode = (value: object) => btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: 'sample-user', email: SAMPLE_ACCOUNT.email, aud: 'authenticated' })}.sample`;
 }
 
 const signedOutListeners = new Set<() => void>();
@@ -84,35 +57,28 @@ function signedOut(): void {
 }
 
 export async function currentSession(): Promise<AppSession | null> {
-  if (DATA_SOURCE === 'sample') {
-    return readSample();
+  const auth = supabase();
+  if (!auth) {
+    return null;
   }
-  const { data } = await supabase().getSession();
+  const { data } = await auth.getSession();
   return data.session ? { accessToken: data.session.access_token, email: data.session.user.email ?? null } : null;
 }
 
 /**
- * Sign-in is a full-page navigation to the engine (CONTRACT.md §4.1a), which sends the browser
- * through Google and back to /auth/callback. In sample mode the button goes straight to
- * /auth/callback with a sample token in the fragment, the same shape the engine sends.
+ * Sign-in is a full-page navigation to the engine on this origin (CONTRACT.md §4.1a), which sends
+ * the browser through Google and back to /auth/callback.
  */
 export function startSignIn(): void {
-  if (DATA_SOURCE === 'sample') {
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
-    window.location.assign(
-      `/auth/callback?status=signed_in&initialSync=completed#access_token=${sampleToken()}&refresh_token=sample&expires_in=3600&expires_at=${expiresAt}&token_type=bearer`,
-    );
-    return;
-  }
-  window.location.assign(`${API_URL}/api/v1/auth/google`);
+  window.location.assign('/api/v1/auth/google');
 }
 
 async function store(tokens: CallbackTokens): Promise<void> {
-  if (DATA_SOURCE === 'sample') {
-    writeSample({ accessToken: tokens.accessToken, email: jwtClaims(tokens.accessToken)?.email ?? null });
-    return;
+  const auth = supabase();
+  if (!auth) {
+    throw new Error('Supabase auth is not configured');
   }
-  const { error } = await supabase().setSession({ access_token: tokens.accessToken, refresh_token: tokens.refreshToken });
+  const { error } = await auth.setSession({ access_token: tokens.accessToken, refresh_token: tokens.refreshToken });
   if (error) {
     throw error;
   }
@@ -138,10 +104,11 @@ export async function completeSignIn(location: Location = window.location): Prom
 
 /** One silent refresh, used after an `UNAUTHENTICATED` response. Null when it fails. */
 export async function refreshSession(): Promise<AppSession | null> {
-  if (DATA_SOURCE === 'sample') {
-    return readSample();
+  const auth = supabase();
+  if (!auth) {
+    return null;
   }
-  const { data, error } = await supabase().refreshSession();
+  const { data, error } = await auth.refreshSession();
   if (error || !data.session) {
     return null;
   }
@@ -149,10 +116,6 @@ export async function refreshSession(): Promise<AppSession | null> {
 }
 
 export async function signOut(): Promise<void> {
-  if (DATA_SOURCE === 'sample') {
-    writeSample(null);
-  } else {
-    await supabase().signOut({ scope: 'local' });
-  }
+  await supabase()?.signOut({ scope: 'local' });
   signedOut();
 }

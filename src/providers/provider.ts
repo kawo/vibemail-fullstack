@@ -159,6 +159,23 @@ export interface DraftResult {
   threadId: string;
 }
 
+/** A listed draft with its content (CONTRACT.md §4.13). */
+export interface ListedDraft extends DraftResult {
+  to: string[];
+  /** `""` when the draft has no subject. */
+  subject: string;
+  /** The first `text/plain` part; `""` when there is none. */
+  body: string;
+  /** The draft message's internal date, which the provider sets on every save. */
+  updatedAt: Date;
+}
+
+/** One page of drafts, newest first, as the provider orders them. */
+export interface DraftPage {
+  drafts: ListedDraft[];
+  nextPageToken: string | null;
+}
+
 export interface WatchResult {
   cursor: SyncCursor;
   /** When push notifications stop unless `watch()` is called again. */
@@ -205,6 +222,13 @@ export interface MailProvider {
 
   /** Deletes a draft (CONTRACT.md §4.12). Rejects with `not_found` for an unknown draft. */
   deleteDraft(draftId: string): Promise<void>;
+
+  /**
+   * One page of drafts with their content (CONTRACT.md §4.13). A draft deleted between the list
+   * and its read is skipped, so a page may be shorter than `limit`. Rejects with
+   * `invalid_request` for a page token the provider doesn't accept.
+   */
+  listDrafts(options: { limit: number; pageToken: string | null }): Promise<DraftPage>;
 
   /** Registers or renews push notifications for the inbox (CONTRACT.md §4.1, §4.5, §4.6). */
   watch(): Promise<WatchResult>;
