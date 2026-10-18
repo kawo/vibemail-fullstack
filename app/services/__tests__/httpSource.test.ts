@@ -59,6 +59,7 @@ describe('httpSource (CONTRACT.md §3.1, §4)', () => {
     expect(new Headers(init.headers).has('Authorization')).toBe(false);
     expect(session.refreshSession).toHaveBeenCalledTimes(1);
     expect(session.signOut).toHaveBeenCalledTimes(1);
+    expect(session.signOut).toHaveBeenCalledWith('expired');
     expect(signals).toEqual(['signed-out']);
   });
 });

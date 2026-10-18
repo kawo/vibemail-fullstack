@@ -140,7 +140,7 @@ export function SettingsPanel({
         disabled={signingOut}
         onClick={() => {
           setSigningOut(true);
-          // Ending the session sends the guard to /auth; the panel goes with the mail screens.
+          // signOut clears the stored JWT and replaces the page with /auth.
           void signOut().catch(() => {
             setSigningOut(false);
             store.toast('Couldn’t sign out. Try again.');

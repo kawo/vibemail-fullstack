@@ -22,4 +22,9 @@ describe('sign-in callback (CONTRACT.md §4.1b)', () => {
   it('treats a signed-in redirect without its fragment as expired', () => {
     expect(parseCallback('?status=signed_in', '')).toEqual({ ok: false, code: 'UNAUTHENTICATED' });
   });
+
+  it('explains an expired session differently from an expired sign-in link', () => {
+    expect(signInMessage('UNAUTHENTICATED', 'SESSION_EXPIRED')).toBe('Your session expired. Please sign in again.');
+    expect(signInMessage('UNAUTHENTICATED')).toMatch(/sign-in link expired/);
+  });
 });

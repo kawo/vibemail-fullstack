@@ -2,14 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
-import { currentSession, onSignedOut } from '@/app/lib/auth/session';
+import { currentSession } from '@/app/lib/auth/session';
 
 /** Set by /auth/callback when the engine's first sync failed; the inbox shows a toast once. */
 export const INITIAL_SYNC_FAILED_KEY = 'vibemail.initialSyncFailed';
 
 /**
  * Keeps the mail screens for signed-in users: until the session is checked it renders nothing;
- * without one (or when it ends) it replaces the page with /auth.
+ * without one it replaces the page with /auth. When the session ends, signOut navigates itself.
  */
 export function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -25,10 +25,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         router.replace('/auth');
       }
     });
-    const off = onSignedOut(() => router.replace('/auth'));
     return () => {
       live = false;
-      off();
     };
   }, [router]);
 
