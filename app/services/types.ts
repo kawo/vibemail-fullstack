@@ -104,6 +104,21 @@ export interface SendMessageRequest {
   subject: string;
   body: string;
   threadId?: string;
+  /** v1.3: uploads from §4.14, at most 20. Left out when there are none. */
+  attachmentIds?: string[];
+}
+
+/** §4.14 request: the file's metadata only; the bytes go straight to Storage. */
+export interface AttachmentUploadRequest {
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/** §4.14 `201` response. */
+export interface AttachmentUploadResponse {
+  attachment: { attachmentId: string; filename: string; mimeType: string; size: number; createdAt: string };
+  upload: { url: string; method: 'PUT'; headers: Record<string, string>; expiresAt: string };
 }
 
 /** §3.7 `DraftRequest`. There is deliberately no `draftId` field. */
