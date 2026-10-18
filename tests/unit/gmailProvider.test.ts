@@ -140,6 +140,31 @@ describe('GmailMailProvider.sendMessage', () => {
     expect(mime).not.toContain('In-Reply-To');
   });
 
+  it('sends by media upload when there are attachments (CONTRACT.md §4.3, v1.3)', async () => {
+    const { provider, calls } = providerWith(() => ({ data: { id: 's2', threadId: 'T1', labelIds: ['SENT'] } }));
+    const result = await provider.sendMessage({
+      from: 'me@example.com',
+      to: ['you@example.com'],
+      subject: 'Files',
+      text: 'Attached',
+      threadId: 'T1',
+      attachments: [{ filename: 'a.pdf', mimeType: 'application/pdf', content: Buffer.from('%PDF') }],
+    });
+    expect(result).toEqual({ id: 's2', threadId: 'T1' });
+    const call = calls[0] as RequestOptions & { data?: { raw?: string } };
+    expect(call.url).toContain('/upload/gmail/v1/users/me/messages/send');
+    expect(call.params?.uploadType).toBe('multipart');
+    expect(call.data?.raw).toBeUndefined();
+  });
+
+  it('keeps the raw JSON send for a message with an empty attachment list', async () => {
+    const { provider, calls } = providerWith(() => ({ data: { id: 's3', threadId: 'T2', labelIds: ['SENT'] } }));
+    await provider.sendMessage({ from: 'me@example.com', to: ['you@example.com'], subject: 'Hi', text: 'Hello', attachments: [] });
+    const call = calls[0] as RequestOptions & { data?: { raw?: string } };
+    expect(call.url).not.toContain('/upload/');
+    expect(typeof call.data?.raw).toBe('string');
+  });
+
   it('maps a 404 to not_found', async () => {
     const { provider } = providerWith(() => {
       throw { response: { status: 404 } };

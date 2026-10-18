@@ -164,14 +164,23 @@ export class GmailMailProvider implements MailProvider {
 
   /** Builds RFC 2822 MIME and sends it; `threadId` is passed to Gmail unchanged (CONTRACT.md §4.3). */
   async sendMessage(message: OutgoingMessage): Promise<{ id: string; threadId: string }> {
+    // With attachments (CONTRACT.md §4.3, v1.3) the message can reach ~34 MB, so it goes by media
+    // upload (accepted up to 35 MB) instead of as base64url inside a JSON body.
+    const hasAttachments = (message.attachments?.length ?? 0) > 0;
     const { data } = await this.call('messages.send', () =>
-      this.gmail.users.messages.send({
-        userId: 'me',
-        requestBody: {
-          raw: toRaw(buildRfc2822(message)),
-          ...(message.threadId ? { threadId: message.threadId } : {}),
-        },
-      }),
+      hasAttachments
+        ? this.gmail.users.messages.send({
+            userId: 'me',
+            requestBody: message.threadId ? { threadId: message.threadId } : {},
+            media: { mimeType: 'message/rfc822', body: buildRfc2822(message) },
+          })
+        : this.gmail.users.messages.send({
+            userId: 'me',
+            requestBody: {
+              raw: toRaw(buildRfc2822(message)),
+              ...(message.threadId ? { threadId: message.threadId } : {}),
+            },
+          }),
     );
     if (!data.id || !data.threadId) {
       throw new ProviderError('upstream', 'messages.send response lacks id or threadId');

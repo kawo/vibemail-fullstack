@@ -1,8 +1,11 @@
+import { MAX_ATTACHMENT_BYTES } from '../attachments';
+import type { AttachmentRow, AttachmentsRepository } from '../db/attachments';
 import type { MessageWrite, MessagesRepository } from '../db/messages';
 import type { UsersRepository } from '../db/users';
 import { ApiError } from '../middleware/errors';
-import { type MailProviderFactory, ProviderError } from '../providers/provider';
+import { type MailProviderFactory, type OutgoingAttachment, ProviderError } from '../providers/provider';
 import { apiErrorFromProvider, providerForUser } from '../services/gmailAccount';
+import type { AttachmentStore } from '../storage/attachments';
 
 /** Send layer, CONTRACT.md §4.3: validate, send through the user's provider, store the sent message. */
 
@@ -11,12 +14,15 @@ export interface SendInput {
   subject: string;
   body: string;
   threadId?: string;
+  attachmentIds?: string[];
 }
 
 export interface SendDeps {
   factory: MailProviderFactory;
   users: UsersRepository;
   messages: MessagesRepository;
+  attachments: AttachmentsRepository;
+  attachmentStore: AttachmentStore;
   now?: () => Date;
   log?: (message: string, error: unknown) => void;
 }
@@ -27,6 +33,8 @@ const ADDR_SPEC = /^[^\s@<>",;:\\]+@[^\s@<>",;:\\]+\.[^\s@<>",;:\\]+$/;
 const NAME_ADDR = /^(?:"[^"\r\n]*"|[^<>"\r\n]*?)\s*<([^<>\s]+)>$/;
 export const THREAD_ID = /^[A-Za-z0-9]+$/;
 export const CR_LF = /[\r\n]/;
+export const MAX_ATTACHMENTS = 20;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isValidAddress(value: string): boolean {
   if (CR_LF.test(value)) {
@@ -42,6 +50,8 @@ export interface ValidatedSend {
   subject: string;
   body: string;
   threadId?: string;
+  /** v1.3: uploads to attach (§4.14); empty when none. */
+  attachmentIds: string[];
 }
 
 /** Validates an untrusted request body. Collects every issue into `details.issues`. */
@@ -82,6 +92,26 @@ export function validateSendInput(input: unknown): ValidatedSend {
     issues.push({ field: 'threadId', message: 'must be a Gmail thread ID' });
   }
 
+  const rawIds = record.attachmentIds;
+  const attachmentIds: string[] = [];
+  if (rawIds !== undefined) {
+    if (!Array.isArray(rawIds)) {
+      issues.push({ field: 'attachmentIds', message: 'must be an array of attachment IDs' });
+    } else if (rawIds.length > MAX_ATTACHMENTS) {
+      issues.push({ field: 'attachmentIds', message: `at most ${MAX_ATTACHMENTS} attachments` });
+    } else {
+      rawIds.forEach((id: unknown, i) => {
+        if (typeof id !== 'string' || !UUID.test(id)) {
+          issues.push({ field: `attachmentIds[${i}]`, message: 'must be an attachment ID' });
+        } else if (attachmentIds.includes(id)) {
+          issues.push({ field: `attachmentIds[${i}]`, message: 'duplicate attachment' });
+        } else {
+          attachmentIds.push(id);
+        }
+      });
+    }
+  }
+
   if (issues.length > 0) {
     throw new ApiError('VALIDATION_FAILED', 'invalid send request', { details: { issues } });
   }
@@ -90,7 +120,50 @@ export function validateSendInput(input: unknown): ValidatedSend {
     subject: subject as string,
     body: body as string,
     ...(typeof threadId === 'string' ? { threadId } : {}),
+    attachmentIds,
   };
+}
+
+/**
+ * Loads the user's uploads for `ids`, in order, before anything is sent (§4.3 step 1). Objects are
+ * read one at a time and the read stops once the stored bytes pass 25 MB, so a request naming 20
+ * large files never holds more than about 50 MB; `totalBytes` then counts the files read so far.
+ */
+async function loadAttachments(deps: SendDeps, userId: string, ids: readonly string[]): Promise<OutgoingAttachment[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const rows = new Map<string, AttachmentRow>((await deps.attachments.getMany(userId, ids)).map((row) => [row.id, row]));
+  const issues: Array<{ field: string; message: string }> = [];
+  ids.forEach((id, i) => {
+    if (!rows.has(id)) {
+      issues.push({ field: `attachmentIds[${i}]`, message: 'unknown attachment' });
+    }
+  });
+  if (issues.length > 0) {
+    throw new ApiError('VALIDATION_FAILED', 'invalid send request', { details: { issues } });
+  }
+  const files: OutgoingAttachment[] = [];
+  let totalBytes = 0;
+  for (const [i, id] of ids.entries()) {
+    const row = rows.get(id) as AttachmentRow;
+    const object = await deps.attachmentStore.read(row.storagePath);
+    if (!object) {
+      issues.push({ field: `attachmentIds[${i}]`, message: 'not uploaded yet' });
+      continue;
+    }
+    totalBytes += object.content.length;
+    if (totalBytes > MAX_ATTACHMENT_BYTES) {
+      throw new ApiError('FILE_TOO_LARGE', 'the attachments are over 25 MB together', {
+        details: { maxBytes: MAX_ATTACHMENT_BYTES, totalBytes },
+      });
+    }
+    files.push({ filename: row.filename, mimeType: object.contentType || 'application/octet-stream', content: object.content });
+  }
+  if (issues.length > 0) {
+    throw new ApiError('VALIDATION_FAILED', 'invalid send request', { details: { issues } });
+  }
+  return files;
 }
 
 const defaultLog = (message: string, error: unknown): void => {
@@ -111,6 +184,7 @@ export async function sendForUser(deps: SendDeps, userId: string, input: unknown
   if (!from) {
     throw new ApiError('GMAIL_NOT_CONNECTED', 'Gmail is not connected');
   }
+  const attachments = await loadAttachments(deps, userId, request.attachmentIds);
   const provider = await providerForUser(deps, userId);
 
   let sent: { id: string; threadId: string };
@@ -121,6 +195,7 @@ export async function sendForUser(deps: SendDeps, userId: string, input: unknown
       subject: request.subject,
       text: request.body,
       ...(request.threadId ? { threadId: request.threadId } : {}),
+      ...(attachments.length > 0 ? { attachments } : {}),
     });
   } catch (error) {
     if (error instanceof ProviderError) {

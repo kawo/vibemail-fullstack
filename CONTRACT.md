@@ -467,7 +467,7 @@ Validation rules (`VALIDATION_FAILED` with `details.issues` listing every failur
    - *Added in v1.3, when `attachmentIds` is non-empty:* before any Gmail call, load the user's `attachments` rows for those IDs (filtered on `user_id`, §5.3) and read each Storage object at its `storage_path` with the service role.
      - An ID with no row for this user (unknown, or another user's) → `VALIDATION_FAILED`, issue `attachmentIds[i]` "unknown attachment".
      - A row whose object doesn't exist yet → `VALIDATION_FAILED`, issue `attachmentIds[i]` "not uploaded yet".
-     - The sum of the **stored** objects' sizes over 26,214,400 bytes → `FILE_TOO_LARGE` with `details: { maxBytes: 26214400, totalBytes }`. The declared `size` of §4.14 is not used.
+     - The sum of the **stored** objects' sizes over 26,214,400 bytes → `FILE_TOO_LARGE` with `details: { maxBytes: 26214400, totalBytes }`. The declared `size` of §4.14 is not used. Objects are read one at a time, in order, and reading stops as soon as the running total passes the limit, so `totalBytes` counts the files read up to that point (the server never holds more than about 50 MB).
      - All of these fail before anything is sent.
 2. Build an RFC 2822 message (`src/providers/gmail/mime.ts`, behind `MailProvider.sendMessage`):
    - Headers: `From: <users.email>`, `To`, `Subject`, `Date`, `MIME-Version: 1.0`.
