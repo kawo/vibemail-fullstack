@@ -3,6 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself. Bearer verification also accepts tokens signed with the Supabase project's asymmetric signing keys (§3.1).
+> **v1.3 addition** (marked *Added in v1.3*, **not implemented yet**): attachment upload, `POST /api/v1/attachments` (§4.14), with the `attachments` table and Storage bucket (§5.5). The file goes from the browser straight to Supabase Storage through a signed URL.
 > Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -28,10 +29,13 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
   - creating, updating and deleting Gmail drafts (§4.10–§4.12);
   - listing the user's Gmail drafts, read from Gmail on request (§4.13).
   - Filtering by label happens in the client, on `status`, `isStarred` and `labelIds`; there is no filter endpoint.
+- *Added in v1.3:* uploading an attachment of up to 25 MB, reserved by the API and stored in Supabase Storage (§4.14).
 
 **Out of scope (v1)**
 
-- Attachments on send (stored attachment *metadata* on received mail is in scope).
+- Attachments on send and on drafts. From v1.3 a file can be uploaded (§4.14), but no endpoint attaches it to a message yet. Stored attachment *metadata* on received mail is in scope.
+- Downloading attachments, uploaded or received, and cleaning up unused uploads.
+- File uploads through a function: Vercel Functions take at most 4.5 MB of request body, so files go to Storage directly (§4.14).
 - Server-side label/unread filters.
 - Scheduled jobs other than watch renewal. In particular, there is no scheduled or request-triggered sync: Gmail is read only at connect time and on push. The thread view and search read the DB only, so they see only stored messages.
 - Permanent delete, emptying the trash, and batch operations.
@@ -929,6 +933,76 @@ interface ListDraftsResponse {
 | `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
 | `INTERNAL` | 500 | An unexpected exception. |
 
+### 4.14 Upload an attachment — `POST /api/v1/attachments` (*Added in v1.3, not implemented yet*)
+
+Reserves an attachment for the signed-in user and returns a short-lived signed URL. The browser then uploads the file **straight to Supabase Storage** with that URL. Function file: `src/endpoints/v1/attachments/index.ts`, served by `app/api/v1/attachments/route.ts`.
+
+**Why the file doesn't pass through this endpoint.** Vercel Functions accept at most 4.5 MB of request body; a larger request is rejected with `413` before the handler runs. A multipart upload of a 25 MB file to a function is therefore impossible. This endpoint takes only the file's metadata (a few hundred bytes); the bytes go to Storage, which enforces the size limit itself.
+
+This version only reserves and stores uploads. Attaching them to a sent message (§4.3) or a draft (§4.10, §4.11) is a later change; until then those endpoints are unchanged and no endpoint reads an upload back.
+
+**Request:** JSON body.
+
+```ts
+interface AttachmentUploadRequest {
+  filename: string;   // 1..255 characters after trimming; no '/', '\' or control characters
+  mimeType: string;   // 'type/subtype', e.g. 'application/pdf'; parameters (';charset=…') are not allowed
+  size: number;       // integer bytes, 1..26214400 (25 MB = 25 × 1024 × 1024)
+}
+```
+
+**Limit: 25 MB per file** (26,214,400 bytes), Gmail's attachment limit. It is enforced twice:
+- here, on the declared `size` → `VALIDATION_FAILED` before anything is reserved;
+- by the Storage bucket's `file_size_limit` (§5.5), on the bytes actually uploaded. The client can't get round the limit by declaring a smaller `size`.
+
+The declared `size` and `mimeType` are informational. When a later change reads an upload, it must use the stored object's real size and type from Storage, not these values.
+
+**Behavior**
+
+1. Authenticate (§3.1). Gmail is not involved: the account doesn't need to be connected, and no Gmail call is made.
+2. Validate the body. The first failing field is reported as `details: { field }`; a too-large `size` also carries `details: { maxBytes: 26214400 }`.
+3. Generate `attachmentId` (a UUID) and insert the `attachments` row (§5.5) with `user_id` from the token, the trimmed `filename`, `mimeType`, `size` and `storage_path = '{user_id}/{attachmentId}'`.
+4. Create a signed upload URL for that path in the private `attachments` bucket, with the service-role client (`storage.from('attachments').createSignedUploadUrl(storagePath)`). It is valid for 2 hours (Supabase's fixed lifetime) and for that one path only.
+   - If this fails, the row from step 3 is deleted and the request fails `INTERNAL`.
+
+**Response — `201 Created`**
+
+```ts
+interface AttachmentUploadResponse {
+  attachment: {
+    attachmentId: string;   // opaque; the client keeps it to reference the upload later
+    filename: string;
+    mimeType: string;
+    size: number;           // as declared
+    createdAt: string;      // ISO 8601
+  };
+  upload: {
+    url: string;                       // signed Supabase Storage URL, single path, single use
+    method: 'PUT';
+    headers: Record<string, string>;   // send exactly these; includes 'Content-Type': mimeType
+    expiresAt: string;                 // ISO 8601, 2 h after the reservation
+  };
+}
+```
+
+**Client upload.** The client sends `PUT upload.url` with the raw file bytes as the body (not multipart) and exactly `upload.headers`. Storage answers `200` when the object is stored. It refuses a body over the bucket limit (`413`), an expired or reused URL, and a second upload to the same path. The client then reserves again; the earlier reservation is simply never used.
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `VALIDATION_FAILED` | 400 | Body is not JSON, or `filename`, `mimeType` or `size` fails a rule above (`details: { field }`; for `size` over the limit also `maxBytes`). |
+| `INTERNAL` | 500 | The DB insert or the signed-URL request failed, or an unexpected exception. |
+
+No new `ErrorCode` is added. As on the other `/api/v1` endpoints, a method other than `POST` or the CORS `OPTIONS` preflight gets a plain `405`, not `METHOD_NOT_ALLOWED` (that code is for §4.1). Errors from the upload itself come from Storage, not from this API, and don't use the §3.3 envelope.
+
+**Known limits (v1.3)**
+
+- **No clean-up.** Reservations that are never uploaded, and uploads that are never used, are kept. Removing them needs a scheduled job, which is out of scope (§1). Deleting a user removes their `attachments` rows (FK cascade), but **not** their Storage objects, which have no foreign key; those stay until removed by hand under `{user_id}/`.
+- **No quota.** There is no per-user limit on the number or total size of uploads.
+- **No download.** There is no endpoint to read an upload back, and no endpoint for attachments of received mail (§4.8 lists their metadata only).
+
 ---
 
 ## 5. Data model
@@ -1011,11 +1085,12 @@ RLS is the same as `messages` (enabled, no policies). Neither `refresh_token` no
 Every query runs as the service role, so RLS does not protect user data. The rules below do.
 
 - All SQL lives in the repository layer (`src/db`). Function code never builds queries.
-- Every repository function that touches `messages` or `users` on behalf of a user takes `userId: string` as a required parameter, and puts `user_id = $userId` in every `SELECT`, `UPDATE` and `DELETE`. Upserts filter on it too: `messages` conflicts on `(user_id, gmail_id)`, and `users` conflicts on `google_id` with the `WHERE users.user_id = EXCLUDED.user_id` guard (§5.2).
+- Every repository function that touches `messages`, `users` or, *from v1.3*, `attachments` on behalf of a user takes `userId: string` as a required parameter, and puts `user_id = $userId` in every `SELECT`, `UPDATE` and `DELETE`. Upserts filter on it too: `messages` conflicts on `(user_id, gmail_id)`, and `users` conflicts on `google_id` with the `WHERE users.user_id = EXCLUDED.user_id` guard (§5.2).
 - `userId` comes only from the verified token's `sub` (§3.1). It is never read from the request body, query string or path.
 - Exactly two functions may query without a `user_id` filter, and their names say so:
   - `findAccountByEmailUnscoped(email)`, for the webhook (§4.5);
   - `listConnectedAccountsUnscoped({ watchExpiringBefore })`, for the cron job (§4.6).
+- *Added in v1.3:* every Storage object path starts with the owner's `user_id` (`{user_id}/{attachmentId}`), built only from the token's `sub` and a server-generated ID, never from client input such as `filename`. Signed URLs are created for one path at a time.
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only and never logged or returned.
 
 ### 5.4 Token encryption
@@ -1027,6 +1102,30 @@ OAuth tokens are encrypted in application code before they reach the database. T
 - **Stored form:** `v1:<iv b64>:<authTag b64>:<ciphertext b64>`, with a fresh 12-byte IV per write. The `v1` prefix allows key rotation later.
 - **Columns:** `users.refresh_token` and `users.access_token`. Only `src/db/` encrypts and decrypts, and plaintext tokens never leave the server process.
 - **Integrity:** a decryption failure (wrong key, or a tampered value) is treated as revoked: `GMAIL_TOKEN_REVOKED`.
+
+### 5.5 `attachments` — one uploaded file (*Added in v1.3, not implemented yet*)
+
+One row per reservation from §4.14. The file itself lives in Supabase Storage, not in Postgres.
+
+| Column | Postgres type | Nullable | Source |
+|---|---|---|---|
+| `id` | `uuid` PK | no | Generated by the server in §4.14 step 3; returned as `attachmentId` |
+| `user_id` | `uuid` FK → `auth.users(id)` on delete cascade | no | `sub` claim of the verified bearer token (§3.1) |
+| `filename` | `text` | no | Request `filename`, trimmed; `CHECK (char_length(filename) BETWEEN 1 AND 255)` |
+| `mime_type` | `text` | no | Request `mimeType` |
+| `size_bytes` | `integer` | no | Request `size` (declared); `CHECK (size_bytes BETWEEN 1 AND 26214400)` |
+| `storage_path` | `text` `UNIQUE` | no | `'{user_id}/{id}'` in the `attachments` bucket |
+| `created_at` | `timestamptz` default `now()` | no | Server time |
+
+- `INDEX (user_id, created_at DESC)`.
+- RLS is the same as `messages` (enabled, no policies).
+- Whether the file was actually uploaded is not stored: it is the presence of the Storage object at `storage_path`.
+
+**Storage bucket `attachments`.** Created by the schema session's migration, like the tables (§6).
+- Private (`public = false`): no public URLs, and the anon and authenticated roles get no Storage policies. Uploads use the signed URLs from §4.14; any later read goes through the service role.
+- `file_size_limit = 26214400` (25 MB). Storage rejects a larger upload whatever `size` was declared.
+- No `allowed_mime_types` restriction.
+- Objects are **not** removed when the user or the row is deleted (§4.14, Known limits).
 
 ---
 
