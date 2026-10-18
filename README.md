@@ -32,7 +32,7 @@ Sync is **push-driven**. Gmail is read once at connect time (a full sync of the 
 | `GET` | `/api/cron/renew-watch` | `CRON_SECRET` bearer | Daily cron job that renews Gmail watches expiring within 24 h |
 
 - **v1.1** rows are contracted in CONTRACT.md but not implemented yet.
-- **Bearer** means a Supabase access token (HS256), verified locally.
+- **Bearer** means a Supabase access token, verified locally: HS256 with `JWT_SECRET`, or ES256/RS256 with the project's published signing keys.
 - **Errors** always use the envelope `{ error: { code, message, retryable, details? } }` (CONTRACT.md §3.3).
 - **Postman:** a collection is in [`docs/vibemail-api.postman_collection.json`](docs/vibemail-api.postman_collection.json).
 
@@ -89,7 +89,7 @@ Signing in needs the engine's variables in `.env` (below), with `FRONTEND_URL=ht
 
 - Node.js and npm
 - The [Supabase CLI](https://supabase.com/docs/guides/cli) for migrations and type generation
-- A Supabase project that signs tokens with the legacy **HS256 shared secret** and has the Google provider enabled, with your `GOOGLE_CLIENT_ID` listed among its authorized client IDs
+- A Supabase project (asymmetric signing keys or the legacy HS256 secret both work) with the Google provider enabled, with your `GOOGLE_CLIENT_ID` listed among its authorized client IDs
 - A Google Cloud project with:
   - an OAuth client whose authorized redirect URI is exactly `{origin}/api/v1/auth/google/callback`;
   - a Pub/Sub topic on which `gmail-api-push@system.gserviceaccount.com` may publish;

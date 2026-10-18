@@ -2,7 +2,7 @@
 
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
-> **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself.
+> **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself. Bearer verification also accepts tokens signed with the Supabase project's asymmetric signing keys (§3.1).
 > Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -87,10 +87,12 @@ The project is complete when **every** item below is true and verifiable.
 - **No session cookies.** Every `/api/v1` endpoint except the two Google sign-in endpoints requires `Authorization: Bearer <Supabase access token>`.
   - The frontend gets that token from the sign-in flow (§4.1), which hands over a Supabase session.
   - The sign-in endpoints are browser navigations and can't carry a header. The start endpoint needs no auth. The callback authenticates with the signed `state`, bound to the browser by a short-lived state cookie (§4.1a). That is the only cookie the API sets, and it never holds a session.
-  - **Verification.** The token is checked locally with `jsonwebtoken`, using `jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'], audience: 'authenticated', issuer: SUPABASE_URL + '/auth/v1' })`.
-    - The `algorithms` allow-list is mandatory. It blocks `alg: none` and algorithm-confusion attacks.
-    - **Prerequisite:** the Supabase project must sign user tokens with the legacy shared secret (HS256). A project switched to asymmetric signing keys would make every request fail `UNAUTHENTICATED`.
-    - Locally, the secret is the `JWT secret` printed by `supabase status`.
+  - **Verification** (*changed in v1.2*). The token is checked locally with `jsonwebtoken`: `jwt.verify(token, key, { algorithms, audience: 'authenticated', issuer: SUPABASE_URL + '/auth/v1' })`. The key and the `algorithms` allow-list come from the token header, and each path accepts only its own algorithm:
+    - `alg: HS256`: the legacy shared secret, `JWT_SECRET`, with `['HS256']`.
+    - `alg: ES256` or `RS256` with a `kid`: the project's public signing key with that `kid`, from `SUPABASE_URL + '/auth/v1/.well-known/jwks.json'`, with the algorithm of that key's type (`['ES256']` for EC, `['RS256']` for RSA). Only `EC` and `RSA` entries are used.
+    - Anything else (including `alg: none` and a `kid` the project doesn't publish) → `UNAUTHENTICATED`. The pinned allow-lists block algorithm-confusion attacks: a public key is never accepted as an HMAC secret.
+    - The key set is cached per warm instance for 10 minutes; an unknown `kid` refetches it at most every 30 seconds. If the keys can't be fetched and none are cached, the request fails `INTERNAL` (500), not `UNAUTHENTICATED`, so an outage doesn't sign users out.
+    - Projects on Supabase's asymmetric signing keys (the default for new projects) and projects on the legacy secret both work. Locally, the secret is the `JWT secret` printed by `supabase status`.
   - The caller's identity is `claims.sub` (the `user_id`) and `claims.email`.
   - A missing, malformed, expired or wrongly signed token → `UNAUTHENTICATED`.
   - Known limit: local verification does not see server-side sign-out, so a revoked session's token stays accepted until it expires (Supabase default: 1 h). This is accepted for v1.

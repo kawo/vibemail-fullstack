@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { MissingEnvError } from '../../src/config/env';
 import type { AppDeps } from '../../src/http/deps';
@@ -107,6 +108,21 @@ describe('JWT middleware on bearer-protected routes (CONTRACT.md §3.1)', () => 
     await expect(envelope(response)).resolves.toEqual({
       error: { code: 'UNAUTHENTICATED', message: expect.any(String), retryable: false },
     });
+  });
+
+  it('accepts an ES256 token signed by a key the project publishes (asymmetric signing keys)', async () => {
+    const { h, deps } = setup();
+    const ec = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    deps.signingKeys = async (kid) => (kid === 'k1' ? ec.publicKey : null);
+    const token = jwt.sign({ sub: USER, email: EMAIL }, ec.privateKey, {
+      algorithm: 'ES256',
+      keyid: 'k1',
+      audience: 'authenticated',
+      issuer: `${SUPABASE}/auth/v1`,
+      expiresIn: '1h',
+    });
+    const response = await h.listMessages(get('/api/v1/messages', token));
+    expect(response.status).toBe(200);
   });
 
   it('applies to send and read too', async () => {
