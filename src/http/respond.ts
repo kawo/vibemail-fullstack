@@ -15,6 +15,7 @@ export const ERROR_STATUS: Record<ErrorCode, { status: number; retryable: boolea
   SYNC_FAILED: { status: 502, retryable: true },
   METHOD_NOT_ALLOWED: { status: 405, retryable: false },
   CONFIG_ERROR: { status: 500, retryable: false },
+  FILE_TOO_LARGE: { status: 413, retryable: false },
   INTERNAL: { status: 500, retryable: false },
 };
 

@@ -14,6 +14,7 @@ export type ErrorCode =
   | 'SYNC_FAILED'
   | 'METHOD_NOT_ALLOWED'
   | 'CONFIG_ERROR'
+  | 'FILE_TOO_LARGE'
   | 'INTERNAL';
 
 export interface ErrorEnvelope {
