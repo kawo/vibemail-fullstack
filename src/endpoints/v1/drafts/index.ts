@@ -1,4 +1,4 @@
-import { handlers } from '../../../src/http';
+import { handlers } from '../../../http';
 
 /** GET /api/v1/drafts — CONTRACT.md §4.13 (bearer): list the user's Gmail drafts. */
 export const GET = handlers.listDrafts;

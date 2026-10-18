@@ -2,20 +2,20 @@
  * The `api/` files are one-line bindings. These tests check each exports exactly the contracted
  * methods, and that a request without configuration yields a 500 envelope rather than a crash.
  */
-import * as signIn from '../../api/v1/auth/google/index';
-import * as callback from '../../api/v1/auth/google/callback';
-import * as list from '../../api/v1/messages/index';
-import * as send from '../../api/v1/messages/send';
-import * as read from '../../api/v1/messages/[id]/read';
-import * as labels from '../../api/v1/messages/[id]';
-import * as search from '../../api/v1/messages/search';
-import * as thread from '../../api/v1/threads/[threadId]';
-import * as drafts from '../../api/v1/drafts/index';
-import * as draft from '../../api/v1/drafts/[draftId]';
-import * as webhook from '../../api/webhook/gmail';
-import * as cron from '../../api/cron/renew-watch';
+import * as signIn from '../../src/endpoints/v1/auth/google/index';
+import * as callback from '../../src/endpoints/v1/auth/google/callback';
+import * as list from '../../src/endpoints/v1/messages/index';
+import * as send from '../../src/endpoints/v1/messages/send';
+import * as read from '../../src/endpoints/v1/messages/[id]/read';
+import * as labels from '../../src/endpoints/v1/messages/[id]';
+import * as search from '../../src/endpoints/v1/messages/search';
+import * as thread from '../../src/endpoints/v1/threads/[threadId]';
+import * as drafts from '../../src/endpoints/v1/drafts/index';
+import * as draft from '../../src/endpoints/v1/drafts/[draftId]';
+import * as webhook from '../../src/endpoints/webhook/gmail';
+import * as cron from '../../src/endpoints/cron/renew-watch';
 
-describe('api/ function files (CONTRACT.md §4)', () => {
+describe('src/endpoints/ handler files (CONTRACT.md §4)', () => {
   it.each([
     ['sign-in', signIn,['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']],
     ['callback', callback, ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']],

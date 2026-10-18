@@ -3,7 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself.
-> Stack: Vercel Functions (Node.js runtime); the handlers live in `api/` and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
+> Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
 
@@ -47,7 +47,7 @@ The project is complete when **every** item below is true and verifiable.
 1. Every route in §4 exists at its exact path and accepts/returns exactly the shapes defined there.
 2. Every `ErrorCode` listed in an endpoint's error table has at least one Jest test that triggers it and asserts the HTTP status and the error envelope from §3.3.
 3. `jest --ci --runInBand` passes (TypeScript via `ts-jest`, TypeScript pinned to 6.x because `ts-jest` does not support 7), including the integration tests in `tests/integration/`. They run against the **dev/test Supabase project** configured in `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`), with the `schema` branch's migration applied there, in the §6 Gate 1 worktree. They never run against production.
-4. `npm run typecheck` (`tsc -p tsconfig.check.json`, covering `src/`, `api/` and `tests/`) passes with `strict: true`, and lint passes with zero errors.
+4. `npm run typecheck` (`tsc -p tsconfig.check.json`, covering `src/` and `tests/`) passes with `strict: true`, and lint passes with zero errors.
 5. A fixture test maps a recorded Gmail `users.messages.get?format=full` response to a `messages` row that matches §5 field for field. It includes a nested `multipart/alternative` inside `multipart/mixed` and one attachment.
 6. Sync is tested for: first sync (no stored `historyId` → full sync, which stores at most 50 messages even when the inbox holds more), incremental sync (`history.list`), and fallback (`history.list` returns HTTP 404 → full sync). `GET /api/v1/messages` makes zero Gmail API calls (asserted with a fake `MailProvider` that fails on any call).
 7. Mark-as-read is idempotent: calling it twice on the same message returns `200` both times with `isRead: true`.
@@ -1036,7 +1036,7 @@ OAuth tokens are encrypted in application code before they reach the database. T
 
 | Session | Branch | Owns (may write) | Must not write |
 |---|---|---|---|
-| Server logic | `main` | `api/`, `src/` except `src/types/` (this includes `src/db/`), `tests/`, `vercel.json`, `package.json` | `supabase/migrations/`, `src/types/` |
+| Server logic | `main` | `src/` except `src/types/` (this includes `src/db/`), `tests/`, `vercel.json`, `package.json` | `supabase/migrations/`, `src/types/` |
 | Schema | `schema` | `supabase/migrations/`, `src/types/` (DB row types and the §3.4 DTOs) | Everything else, **in particular `src/db/`** |
 
 `supabase/migrations/` is the only directory the Supabase CLI applies, so that is where migrations live. With the Supabase GitHub integration enabled, merging to `main` runs them against production, which is why merging is gated.

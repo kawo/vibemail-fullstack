@@ -9,7 +9,7 @@ Sync is **push-driven**. Gmail is read once at connect time (a full sync of the 
 ## Stack
 
 - Node.js and TypeScript (strict, pinned to 6.x)
-- Vercel Functions on the Node.js runtime, from the top-level `api/` directory, with no framework
+- Vercel Functions on the Node.js runtime, served through Next.js route files that re-export the handlers in `src/endpoints/`
 - Supabase: Postgres and Auth, with a single server-side service-role client
 - `googleapis` (Gmail API v1) with `google-auth-library` 11
 - Jest via `ts-jest`, plus `supertest`
@@ -39,12 +39,12 @@ Sync is **push-driven**. Gmail is read once at connect time (a full sync of the 
 ## Project layout
 
 ```
-api/                 engine handlers (thin wrappers), served through app/api/** route re-exports
-  v1/auth/google/    OAuth start and callback
-  v1/messages/       list, send, mark-as-read
-  webhook/gmail.ts   Pub/Sub push receiver (served at /webhook/gmail by app/webhook/gmail/route.ts)
-  cron/              watch renewal
 src/
+  endpoints/         engine handlers (thin wrappers), served through app/api/** route re-exports
+    v1/auth/google/  OAuth start and callback
+    v1/messages/     list, send, mark-as-read
+    webhook/gmail.ts Pub/Sub push receiver (served at /webhook/gmail by app/webhook/gmail/route.ts)
+    cron/            watch renewal
   config/            environment loading
   db/                Supabase repositories, token encryption (only place with SQL)
   http/              request handling, CORS, responses
@@ -66,7 +66,7 @@ tests/integration/   tests against a real dev/test Supabase project
 
 ```
 app/                 routes: auth/, auth/callback/, (mail)/inbox, (mail)/thread/[threadId]
-  api/  webhook/     route files that re-export the engine's api/ handlers
+  api/  webhook/     route files that re-export the engine's src/endpoints/ handlers
   components/        UI: MessageRow (inbox, search, thread), ComposeDrawer (mode prop), sidebar, settings
   lib/               pure logic and its Vitest tests
   services/          data layer: DataSource, served by httpSource
@@ -149,7 +149,7 @@ npm run typecheck
 - `npm test` runs `jest --ci --runInBand`. `--runInBand` is required because the integration tests share one database.
 - **Integration tests** (`npx jest tests/integration`) run against the dev/test Supabase project in `.env`, never production. They create and delete `@vibemail.test` users, and they need the migrations applied to that project.
 - **Passing** means `numFailedTests`, `numPendingTests` and `numTodoTests` are all 0 in `--json` output. A leftover `.only` shows up as pending tests.
-- **Type-checking** always goes through `tsconfig.check.json`. Never run bare `tsc`: the base `tsconfig.json` fails with TS6059 by design, and Next.js compiles `api/` through the route re-exports.
+- **Type-checking** always goes through `tsconfig.check.json`. Never run bare `tsc`; Next.js compiles `src/endpoints/` through the route re-exports.
 
 ## Database
 
@@ -177,7 +177,7 @@ Work is split between two sessions (CONTRACT.md §6):
 
 | Session | Branch | Owns |
 |---|---|---|
-| Server logic | `main` | `api/`, `src/` (except `src/types/`), `tests/`, `vercel.json`, `package.json` |
+| Server logic | `main` | `src/` (except `src/types/`), `tests/`, `vercel.json`, `package.json` |
 | Schema | `schema` | `supabase/migrations/`, `src/types/` |
 
 The `schema` branch is merged only after **Gate 1** passes: in a throwaway worktree with `schema` merged into `main`, `npm test` exits 0 and type-checking is clean. CONTRACT.md §6 has the exact commands.

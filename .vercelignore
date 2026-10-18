@@ -1,1 +1,8 @@
-web
+# Never upload local secrets or scratch files with `vercel deploy`; the project's own env vars apply.
+.env
+.env.*
+!.env.example
+.superpowers
+.claude
+coverage
+jest-results.json
