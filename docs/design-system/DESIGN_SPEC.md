@@ -170,19 +170,39 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
   - **Sender:** the display name of `fromAddress` ("You" on sent cards), then its bare address in brackets, quieter (`mute`, 12px): "Lena Ortiz (lena@northwind.example)". The brackets are left out when the name already is the address. A sender line too long for the card ends in an ellipsis, with the address in a tooltip.
   - **Collapsed card:** `fromAddress`, `snippet` and `internalDate`.
   - **Expanded card header:** `fromAddress`, `toAddress`, `ccAddresses` (when non-empty) and `internalDate`.
-  - **Expanded card body:** by default `bodyPlain` when it has text, otherwise `bodyHtml`, otherwise `snippet`. Blank or whitespace-only text counts as none.
-    - **Plain | HTML switch.** A two-option segmented control in the header ("Message format") picks the format of the *current message*: the most recently expanded card that is still open (at first the newest). It shows that message's format: Plain for `bodyPlain` (or `snippet` when there is no plain text), HTML for the sandboxed `bodyHtml`. HTML is disabled when the message's `bodyHtml` is `null` or blank; both options are disabled when no card is open. The pick is kept per message and resets when another thread opens.
-    - `bodyPlain` is rendered with line breaks preserved.
-    - `bodyHtml` is sanitised and rendered in a frame with `sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"`: no scripts run, links open in a new tab, and remote images stay blocked until the user allows them.
+  - **Expanded card body:** plain text by default, with the header's Plain | HTML switch to change it; see **Message body** below.
 - **Status badges.** A card whose `status` is `trash`, `spam` or `archived` shows a small badge with that value. A card whose `status` is `sent` is aligned to the right.
 - **Attachments.** Each entry in `attachments` is listed by `filename`, `mimeType` and `size`. The list is informational only: the contract has no attachment download endpoint.
 - **Truncated threads.** When `truncated` is `true`, a frosted banner above the first card reads "Earlier messages in this conversation aren't available in VibeMail".
+
+### Message body
+
+How an expanded card renders its message, and the two header controls that relate to it.
+
+- **Default: plain text.** A card opens on `bodyPlain`, rendered as text with line breaks preserved, never as markup. Blank or whitespace-only text counts as none.
+  - A message with no plain text but with `bodyHtml` opens on its HTML version instead, so it never shows only a snippet.
+  - A message with neither shows its `snippet`.
+- **Plain | HTML switch.** A two-option segmented control in the header, labelled "Message format", beside the read toggle, the star and View in Gmail.
+  - **Which message it changes:** the *current message*, the most recently expanded card that is still open. When a thread opens, that is the newest message. Collapsing the current card hands the switch to the card expanded before it.
+  - **What it shows:** the current message's format. **Plain** is `bodyPlain` (or `snippet` when there is no plain text); **HTML** is the sandboxed `bodyHtml` frame (below).
+  - **Disabled states:** HTML is disabled, with the tooltip "This message has no HTML version", when the message's `bodyHtml` is `null` or blank. Both options are disabled, with the tooltip "Open a message to choose its format", when no card is open.
+  - **Memory:** the pick is kept per message while the thread stays open, so cards can show different formats side by side. Opening another thread (or reopening this one) resets every message to the default.
+  - It is a radio group: arrow keys move between the options, and each option names itself ("Plain", "HTML") to screen readers.
+  - On touch screens each option keeps its 28px height but gains an invisible hit area that reaches 44px. On screens narrower than 480px the header drops its gaps and side padding so the six buttons and the switch fit a 360px screen.
+- **HTML frame.** `bodyHtml` is sanitised (DOMPurify; `<style>` elements removed) and rendered in an `<iframe>` with `sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"`.
+  - No scripts run: the sandbox has no `allow-scripts`. `allow-same-origin` exists only so the app can measure the frame.
+  - Links open in a new tab (`<base target="_blank">` and the popup permissions).
+  - A Content-Security-Policy blocks every remote resource. Remote images stay hidden behind a "Remote images are hidden. Show images" notice until the user allows them for that message; inline (`data:`, `cid:`) images always show.
+  - The frame is sized to its content (the height of its `<html>` box), up to 4000px, so it shows no inner scrollbar.
+- **View in Gmail.** A header link (`external` icon, labelled and titled "View in Gmail") that opens the conversation in Gmail's web app in a new tab: `https://mail.google.com/mail/?authuser={account email}#all/{threadId}`, with `rel="noopener noreferrer"`. `authuser` picks the signed-in account when the browser holds several Google accounts; without a known email the parameter is left out. It is for anything VibeMail doesn't show, such as attachments, which have no download endpoint.
 
 ### User actions
 
 - **Expand or collapse:** tap a card. Expanding a card whose `isRead` is `false` calls `POST /api/v1/messages/{id}/read` for its `gmailId`.
 - **Reply:** the reply button on any expanded card opens the compose drawer in reply mode for that message (§3).
 - **Star / unstar:** a per-card star, as in the inbox, through `PATCH /api/v1/messages/{id}`.
+- **Switch format:** pick Plain or HTML in the header for the current message (see Message body). No request is sent; both versions are already in the thread response.
+- **View in Gmail:** opens the conversation in Gmail in a new tab. No request is sent.
 - **Archive the conversation:** sends `PATCH /api/v1/messages/{id}` with `{ removeLabelIds: ['INBOX'] }` for every card whose `status` is `inbox`, one request at a time. When all have settled, the app returns to the inbox.
 - **Trash the conversation:** sends `{ addLabelIds: ['TRASH'] }` for every card whose `status` is not `trash`, one at a time, then returns to the inbox.
 - **Restore the conversation** (in place of trash, as above): sends `{ removeLabelIds: ['TRASH'] }` for every card whose `status` is `trash`, one at a time, toasts "Conversation restored to the inbox" and returns to the list. The server derives each restored message's new `status`.
