@@ -173,6 +173,10 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
   // v1.3 attachments (DESIGN_SPEC.md §3): chips in state; the File objects and in-flight uploads
   // in refs, keyed by chip. Closing the drawer drops them all (attachments are not drafts).
   const [attached, setAttached] = useState<AttachmentChip[]>([]);
+  // The latest chips, for handlers that run before the next render (two picks in a row, or a
+  // pick while an upload's result is still queued).
+  const attachedRef = useRef(attached);
+  attachedRef.current = attached;
   const attachedFiles = useRef(new Map<string, File>());
   const uploads = useRef(new Map<string, AbortController>());
   const nextKey = useRef(0);
@@ -269,16 +273,22 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     })();
   };
 
+  /** A banner from a failed send no longer describes what Send would do now. */
+  const clearSendBanner = () => setProblem((prev) => (prev?.kind === 'banner' ? null : prev));
+
   const attachFiles = (files: File[]) => {
-    const next = addFiles(attached, files, () => `a${++nextKey.current}`);
-    const added = next.slice(attached.length);
+    const base = attachedRef.current;
+    const added = addFiles(base, files, () => `a${++nextKey.current}`).slice(base.length);
+    attachedRef.current = [...base, ...added];
     added.forEach((chip, i) => {
       const file = files[i];
       if (file) {
         attachedFiles.current.set(chip.key, file);
       }
     });
-    setAttached(next);
+    // Appended, not replaced: an upload settled meanwhile keeps its result.
+    setAttached((prev) => [...prev, ...added]);
+    clearSendBanner();
     for (const chip of added.filter((c) => c.state === 'uploading')) {
       startUpload(chip.key);
     }
@@ -289,6 +299,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     uploads.current.delete(key);
     attachedFiles.current.delete(key);
     setAttached((prev) => removeChip(prev, key));
+    clearSendBanner();
   };
 
   const retryAttachment = (key: string) => {
@@ -427,6 +438,11 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
   };
 
   const send = async (current: ComposeFields = fields()) => {
+    // Every route to send (Send, Ctrl+Enter, a banner's Retry or "Send as new") waits for the
+    // attachments: none uploading, none failed, not over 25 MB together (§3 Attachments).
+    if (sendBlock(attachedRef.current) !== null) {
+      return;
+    }
     const found = validateForSend(current);
     setIssues(found);
     if (found.length > 0) {
@@ -435,7 +451,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     setSending(true);
     setProblem(null);
     const sentDraftId = draftIdRef.current;
-    const attachmentIds = attachmentIdsOf(attached);
+    const attachmentIds = attachmentIdsOf(attachedRef.current);
     const afterSent = (text: string) => {
       if (sentDraftId) {
         void deleteDraftQuietly(sentDraftId, false);
