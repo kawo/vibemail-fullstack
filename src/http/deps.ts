@@ -29,6 +29,8 @@ export interface AppDeps {
   cronSecret: string | undefined;
   waitUntil: (promise: Promise<unknown>) => void;
   now: () => Date;
+  /** New attachment IDs (§4.14); tests pin it. Defaults to a random UUID. */
+  newId?: () => string;
   log: (message: string, error?: unknown) => void;
 }
 
