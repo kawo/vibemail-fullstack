@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'SYNC_FAILED'
   | 'METHOD_NOT_ALLOWED'
   | 'CONFIG_ERROR'
+  | 'FILE_TOO_LARGE'
   | 'INTERNAL';
 
 /** A failure that maps 1:1 onto the §3.3 error envelope. */

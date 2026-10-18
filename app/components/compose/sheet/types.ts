@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import type { AttachmentChip } from '@/app/lib/attachments';
 
 /**
  * What the compose sheet shows. The sheet only renders this; `ComposeDrawer` owns the state,
@@ -50,6 +51,10 @@ export interface ComposeView {
   canSend: boolean;
   canSaveDraft: boolean;
   expanded: boolean;
+  /** v1.3: one chip per picked file (§3 Attachments). */
+  attachments: readonly AttachmentChip[];
+  /** Why the attachments hold Send back, or null. */
+  attachHint: string | null;
 }
 
 export interface ComposeActions {
@@ -65,6 +70,9 @@ export interface ComposeActions {
   onSend: () => void;
   onClose: () => void;
   onToggleExpand: () => void;
+  onAttachFiles: (files: File[]) => void;
+  onRemoveAttachment: (key: string) => void;
+  onRetryAttachment: (key: string) => void;
 }
 
 export interface ComposeRefs {

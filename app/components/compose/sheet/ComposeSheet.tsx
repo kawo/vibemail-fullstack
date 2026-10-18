@@ -1,5 +1,7 @@
 import { useId } from 'react';
+import { AttachmentChips } from '@/app/components/compose/sheet/AttachmentChips';
 import { BodyField } from '@/app/components/compose/sheet/BodyField';
+import { ComposeFooter } from '@/app/components/compose/sheet/ComposeFooter';
 import { ComposeHeader } from '@/app/components/compose/sheet/ComposeHeader';
 import { RecipientField } from '@/app/components/compose/sheet/RecipientField';
 import type { ComposeActions, ComposeNoticeView, ComposeRefs, ComposeView } from '@/app/components/compose/sheet/types';
@@ -28,6 +30,8 @@ function Notice({ notice }: { notice: ComposeNoticeView }) {
  *     RecipientField  To, tag-style (locked in reply mode)
  *     Subject
  *     BodyField       text, quoted excerpt, "Discard draft" chip
+ *     AttachmentChips one chip per picked file, and why Send waits
+ *   ComposeFooter   "Attach files" (paperclip)                            (pinned)
  *
  * `placement="overlay"` is the real drawer (fixed, keyboard-aware); `"inline"` lays it out in
  * place for the gallery.
@@ -124,7 +128,15 @@ export function ComposeSheet({
           onChange={actions.onTextChange}
           onDiscardDraft={actions.onDiscardDraft}
         />
+        <AttachmentChips
+          chips={view.attachments}
+          blockHint={view.attachHint}
+          disabled={view.sending}
+          onRemove={actions.onRemoveAttachment}
+          onRetry={actions.onRetryAttachment}
+        />
       </div>
+      <ComposeFooter disabled={view.sending} onAttachFiles={actions.onAttachFiles} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { ProviderError } from '../../src/providers/provider';
 import { isValidAddress, sendForUser, validateSendInput } from '../../src/send';
 import { createFakeProviderFactory } from '../fakes/fakeProvider';
+import { MemoryAttachmentStore, MemoryAttachments } from '../fakes/memoryAttachments';
 import { MemoryMessages, MemoryUsers } from '../fakes/memoryRepos';
 
 const USER = 'user-1';
@@ -22,7 +23,17 @@ function setup(connected = true) {
   }
   const messages = new MemoryMessages();
   const log = jest.fn();
-  return { deps: { factory, users, messages, now: () => at, log }, box, users, messages, log };
+  const attachments = new MemoryAttachments();
+  const attachmentStore = new MemoryAttachmentStore();
+  return {
+    deps: { factory, users, messages, attachments, attachmentStore, now: () => at, log },
+    box,
+    users,
+    messages,
+    log,
+    attachments,
+    attachmentStore,
+  };
 }
 
 describe('sendForUser (CONTRACT.md §4.3)', () => {
@@ -122,7 +133,7 @@ describe('validateSendInput', () => {
   });
 
   it('accepts a single address string, an empty body and an empty subject', () => {
-    expect(validateSendInput({ to: ' a@x.io ', subject: '', body: '' })).toEqual({ to: ['a@x.io'], subject: '', body: '' });
+    expect(validateSendInput({ to: ' a@x.io ', subject: '', body: '' })).toEqual({ to: ['a@x.io'], subject: '', body: '', attachmentIds: [] });
   });
 
   it('caps recipients at 100 and subjects at 998 characters', () => {
@@ -140,5 +151,100 @@ describe('validateSendInput', () => {
     ['Bob <not an address>', false],
   ])('isValidAddress(%j) is %s', (address, valid) => {
     expect(isValidAddress(address)).toBe(valid);
+  });
+});
+
+describe('sendForUser with attachments (CONTRACT.md §4.3, v1.3)', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+  const C = '33333333-3333-4333-8333-333333333333';
+  const request = { to: 'you@example.com', subject: 'Files', body: 'Attached' };
+
+  /** Reserves a row and, unless `uploaded` is false, stores its object. */
+  async function attach(
+    t: ReturnType<typeof setup>,
+    id: string,
+    options: { owner?: string; filename?: string; bytes?: number; contentType?: string; uploaded?: boolean } = {},
+  ) {
+    const owner = options.owner ?? USER;
+    const storagePath = `${owner}/${id}`;
+    await t.attachments.create(owner, { id, filename: options.filename ?? `${id}.bin`, mimeType: 'application/x-declared', size: 1, storagePath });
+    if (options.uploaded !== false) {
+      t.attachmentStore.objects.set(storagePath, {
+        content: Buffer.alloc(options.bytes ?? 3, 7),
+        contentType: options.contentType ?? 'application/pdf',
+      });
+    }
+  }
+
+  it('sends the stored files, in order, with their stored content type', async () => {
+    const t = setup();
+    await attach(t, A, { filename: 'b.pdf', bytes: 5 });
+    await attach(t, B, { filename: 'a.txt', contentType: '' });
+    await sendForUser(t.deps, USER, { ...request, attachmentIds: [A, B] });
+    expect(t.box.sent[0]?.attachments).toEqual([
+      { filename: 'b.pdf', mimeType: 'application/pdf', content: Buffer.alloc(5, 7) },
+      { filename: 'a.txt', mimeType: 'application/octet-stream', content: Buffer.alloc(3, 7) },
+    ]);
+  });
+
+  it.each([
+    ['not an array', 'abc', 'attachmentIds'],
+    ['more than 20', Array.from({ length: 21 }, (_, i) => `${String(i).padStart(8, '0')}-1111-4111-8111-111111111111`), 'attachmentIds'],
+    ['a duplicate', [A, A], 'attachmentIds[1]'],
+    ['not a UUID', ['nope'], 'attachmentIds[0]'],
+  ])('rejects attachmentIds that are %s', async (_name, attachmentIds, field) => {
+    const t = setup();
+    await expect(sendForUser(t.deps, USER, { ...request, attachmentIds })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { issues: expect.arrayContaining([expect.objectContaining({ field })]) },
+    });
+    expect(t.box.calls).toEqual([]);
+  });
+
+  it("treats another user's attachment as unknown, before calling Gmail", async () => {
+    const t = setup();
+    await attach(t, A, { owner: 'someone-else' });
+    await expect(sendForUser(t.deps, USER, { ...request, attachmentIds: [A] })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { issues: [{ field: 'attachmentIds[0]', message: 'unknown attachment' }] },
+    });
+    expect(t.box.calls).toEqual([]);
+  });
+
+  it('reports an attachment that was reserved but not uploaded yet', async () => {
+    const t = setup();
+    await attach(t, A);
+    await attach(t, B, { uploaded: false });
+    await expect(sendForUser(t.deps, USER, { ...request, attachmentIds: [A, B] })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      details: { issues: [{ field: 'attachmentIds[1]', message: 'not uploaded yet' }] },
+    });
+    expect(t.box.calls).toEqual([]);
+  });
+
+  it('answers FILE_TOO_LARGE when the stored files are over 25 MB together, ignoring declared sizes', async () => {
+    const t = setup();
+    await attach(t, A, { bytes: 13_107_200 });
+    await attach(t, B, { bytes: 13_107_200 });
+    await attach(t, C, { bytes: 1 });
+    await expect(sendForUser(t.deps, USER, { ...request, attachmentIds: [A, B, C] })).rejects.toMatchObject({
+      code: 'FILE_TOO_LARGE',
+      details: { maxBytes: 26214400, totalBytes: 26214401 },
+    });
+    expect(t.box.calls).toEqual([]);
+  });
+
+  it('sends exactly 25 MB in total', async () => {
+    const t = setup();
+    await attach(t, A, { bytes: 26_214_400 });
+    await sendForUser(t.deps, USER, { ...request, attachmentIds: [A] });
+    expect(t.box.sent).toHaveLength(1);
+  });
+
+  it('sends without attachments when the list is empty', async () => {
+    const t = setup();
+    await sendForUser(t.deps, USER, { ...request, attachmentIds: [] });
+    expect(t.box.sent[0]).not.toHaveProperty('attachments');
   });
 });

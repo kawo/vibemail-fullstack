@@ -14,6 +14,7 @@ import * as drafts from '../../src/endpoints/v1/drafts/index';
 import * as draft from '../../src/endpoints/v1/drafts/[draftId]';
 import * as webhook from '../../src/endpoints/webhook/gmail';
 import * as cron from '../../src/endpoints/cron/renew-watch';
+import * as attachments from '../../src/endpoints/v1/attachments/index';
 
 describe('src/endpoints/ handler files (CONTRACT.md §4)', () => {
   it.each([
@@ -27,6 +28,7 @@ describe('src/endpoints/ handler files (CONTRACT.md §4)', () => {
     ['thread', thread, ['GET', 'OPTIONS']],
     ['drafts', drafts, ['GET', 'OPTIONS', 'POST']],
     ['draft', draft, ['DELETE', 'OPTIONS', 'PATCH']],
+    ['attachments', attachments, ['OPTIONS', 'POST']],
     ['webhook', webhook, ['POST']],
     ['cron', cron, ['GET']],
   ])('%s exports only %j', (_name, module, methods) => {

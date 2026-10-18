@@ -2611,11 +2611,128 @@ mark {
   }
 }
 
+
+/* ---------- Compose attachments (DESIGN_SPEC.md §3 Attachments) ---------- */
+/* The pinned footer under the scrolling area: the "Attach files" paperclip. */
+.compose-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-top: 1px solid var(--hairline-strong);
+  flex: none;
+}
+
+.compose-attachments {
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+.attachment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 2px 0 var(--space-sm);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
+}
+
+.attachment-chip .attachment-glyph {
+  color: var(--mute);
+  flex: none;
+}
+
+.attachment-name {
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.attachment-size {
+  color: var(--mute);
+  flex: none;
+  white-space: nowrap;
+}
+
+.attachment-chip.error {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+
+.attachment-chip.error .attachment-size,
+.attachment-chip.error .attachment-glyph {
+  color: var(--danger-text);
+}
+
+.attachment-error {
+  font-weight: 500;
+  white-space: nowrap;
+  flex: none;
+}
+
+.attachment-retry {
+  color: var(--danger-text);
+}
+
+.attachment-remove {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.attachment-remove:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.attachment-hint {
+  margin: var(--space-xs) 0 0;
+  color: var(--mute);
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: calc(16px * var(--text-scale, 1));
+}
+
 /* ---------- Touch screens ---------- */
 /* Fingers need bigger targets than pointers: every tappable area is at least 44 × 44px.
    Standalone buttons grow to 44px. Small controls inside rows, cards and fields keep their
    visible size and gain an invisible hit area, centred on them, that grows to 44px. */
 @media (pointer: coarse) {
+  /* Compose attachments: the footer paperclip grows to 44px; a chip's remove and Retry keep their
+     visible size and gain a 44px-tall invisible hit area. */
+  .compose-footer .icon-btn {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .attachment-remove::after,
+  .attachment-retry::after {
+    content: '';
+    position: absolute;
+    inset: -8px -4px;
+  }
+
+  .attachment-retry {
+    position: relative;
+  }
+
   /* The header's Plain | HTML segments are 28px tall; tapping the label picks its radio. */
   .thread-head .body-format label::after {
     content: '';

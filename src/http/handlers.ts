@@ -1,4 +1,5 @@
 import { renewWatches, verifyCronSecret } from '../cron/renewWatch';
+import { reserveAttachment } from '../attachments';
 import { createDraft, deleteDraft, listDrafts, parseDraftListQuery, updateDraft } from '../drafts';
 import { ApiError } from '../middleware/errors';
 import { requireUser } from '../middleware/auth';
@@ -49,6 +50,8 @@ export interface Handlers {
   createDraft: Handler;
   updateDraft: Handler;
   deleteDraft: Handler;
+  /** `POST /api/v1/attachments` (CONTRACT.md §4.14, v1.3). */
+  reserveAttachment: Handler;
   gmailWebhook: Handler;
   renewWatch: Handler;
 }
@@ -249,6 +252,11 @@ export function createHandlers(getDeps: () => AppDeps): Handlers {
     listDrafts: authenticated(async (deps, user, request) => {
       const query = parseDraftListQuery(new URL(request.url));
       return jsonResponse(await listDrafts(deps, user.userId, query), 200);
+    }),
+
+    reserveAttachment: authenticated(async (deps, user, request) => {
+      const reserved = await reserveAttachment(deps, user.userId, await readJson(request));
+      return jsonResponse(reserved, 201);
     }),
 
     createDraft: authenticated(async (deps, user, request) => {

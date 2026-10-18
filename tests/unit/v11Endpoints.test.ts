@@ -10,6 +10,7 @@ import { ProviderError } from '../../src/providers/provider';
 import { createFakeProviderFactory, fakeMessage } from '../fakes/fakeProvider';
 import { FakeSessions } from '../fakes/fakeSessions';
 import { MemoryMessages, MemoryUsers } from '../fakes/memoryRepos';
+import { MemoryAttachmentStore, MemoryAttachments } from '../fakes/memoryAttachments';
 
 const SECRET = 'test-jwt-secret-at-least-32-characters!!';
 const SUPABASE = 'https://proj.supabase.co';
@@ -49,6 +50,8 @@ function setup(connected = true) {
     users,
     messages,
     sessions: new FakeSessions({ userId: USER, email: EMAIL }),
+    attachments: new MemoryAttachments(),
+    attachmentStore: new MemoryAttachmentStore(),
     jwtSecret: SECRET,
     supabaseUrl: SUPABASE,
     frontendUrl: FRONTEND,

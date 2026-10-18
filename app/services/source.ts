@@ -1,4 +1,6 @@
 import type {
+  AttachmentUploadRequest,
+  AttachmentUploadResponse,
   DraftDTO,
   DraftRequest,
   ListDraftsResponse,
@@ -38,4 +40,6 @@ export interface DataSource {
   updateDraft(draftId: string, request: DraftRequest): Promise<{ draft: DraftDTO }>;
   /** §4.12 `DELETE /api/v1/drafts/{draftId}` */
   deleteDraft(draftId: string): Promise<undefined>;
+  /** §4.14 `POST /api/v1/attachments` (*v1.3*): reserve an upload; `uploadToStorage` sends the file. */
+  reserveAttachment(request: AttachmentUploadRequest, signal?: AbortSignal): Promise<AttachmentUploadResponse>;
 }

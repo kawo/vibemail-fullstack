@@ -2,6 +2,8 @@ import { currentSession, refreshSession, signOut } from '@/app/lib/auth/session'
 import { ApiError, emitApiSignal } from './errors';
 import type { DataSource } from './source';
 import type {
+  AttachmentUploadRequest,
+  AttachmentUploadResponse,
   DraftDTO,
   DraftRequest,
   ErrorEnvelope,
@@ -128,4 +130,7 @@ export const httpSource: DataSource = {
 
   deleteDraft: (draftId: string) =>
     call<undefined>('DELETE', `/api/v1/drafts/${encodeURIComponent(draftId)}`, { quietReconnect: true }),
+
+  reserveAttachment: (request: AttachmentUploadRequest, signal?: AbortSignal) =>
+    call<AttachmentUploadResponse>('POST', '/api/v1/attachments', { body: request, ...(signal ? { signal } : {}) }),
 };

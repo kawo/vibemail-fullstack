@@ -52,6 +52,17 @@ describe('compose rules (DESIGN_SPEC.md §3)', () => {
     ]);
   });
 
+  it('leaves attachment issues to the attachment chips', () => {
+    expect(
+      issuesFromDetails({
+        issues: [
+          { field: 'attachmentIds[0]', message: 'not uploaded yet' },
+          { field: 'subject', message: 'too long' },
+        ],
+      }),
+    ).toEqual([{ field: 'subject', message: 'too long' }]);
+  });
+
   it('treats an untouched drawer as blank, but not a reply', () => {
     expect(isBlank({ to: [], subject: ' ', body: '\n' })).toBe(true);
     expect(isBlank({ to: [], subject: '', body: '', threadId: 'T1' })).toBe(false);

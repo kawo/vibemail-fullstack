@@ -231,9 +231,10 @@ Primary endpoints:
 - `POST /api/v1/messages/send` (§4.3);
 - `POST /api/v1/drafts` (§4.10, *v1.1*);
 - `PATCH /api/v1/drafts/{draftId}` (§4.11, *v1.1*);
-- `DELETE /api/v1/drafts/{draftId}` (§4.12, *v1.1*).
+- `DELETE /api/v1/drafts/{draftId}` (§4.12, *v1.1*);
+- `POST /api/v1/attachments` (§4.14, *v1.3*), then an upload straight to Supabase Storage.
 
-The drawer edits the request fields `to`, `subject`, `body` and `threadId` (§4.3, §3.7). It holds at most one `draftId`, which it received from the server.
+The drawer edits the request fields `to`, `subject`, `body`, `threadId` and, *from v1.3*, `attachmentIds` (§4.3, §3.7). It holds at most one `draftId`, which it received from the server.
 
 The drawer is a modal dialog. While it is open the app behind it is inert (no clicks, no keyboard focus, hidden from screen readers), and Tab and Shift+Tab wrap around the drawer's own controls. Closing it, by any route, returns focus to the control that opened it (the Compose button, Reply, or a draft in the list).
 
@@ -284,6 +285,26 @@ The drawer is a modal dialog. While it is open the app behind it is inert (no cl
 - **Discard:** after a confirmation ("Discard draft?"), if a `draftId` is held, the app calls `DELETE /api/v1/drafts/{draftId}`. It clears the snapshot and closes the drawer.
 - **Expand:** desktop only. Expanding enlarges the drawer to a centred glass modal; collapsing restores it.
 
+### Attachments
+
+*Added in v1.3.* Files travel with the message, not with the draft.
+
+- **Attach.** A footer bar is pinned under the scrolling area. It holds a paperclip icon button, labelled and titled "Attach files", which opens the native file picker with several files allowed. Picking the same file again adds it again. The button is disabled while sending.
+- **Chips.** Each picked file becomes one chip in a list under the body field, in the order picked. A chip shows the filename (ending in an ellipsis when too long, the full name in its tooltip), its size, and a remove button "Remove {filename}".
+- **Upload, one per file, at once.** For each file the app calls `POST /api/v1/attachments` with `{ filename, mimeType, size }` (`mimeType` is `application/octet-stream` when the browser gives none), then `PUT`s the file to the returned `upload.url` with exactly `upload.headers`. That request goes to Storage and never carries the VibeMail session token. On success the chip keeps the `attachmentId`.
+- **Chip states.**
+  - *Uploading:* a spinner in the chip, which is `aria-busy`.
+  - *Ready:* the paperclip glyph.
+  - *Error:* the chip turns red (`danger` tokens) with a short reason:
+    - "Larger than 25 MB": checked in the browser before any request (more than 26,214,400 bytes), or the server answered `FILE_TOO_LARGE`. No Retry;
+    - "At most 20 attachments": the 21st and later chips, not uploaded. No Retry;
+    - "Upload failed": any other failure of either request. A Retry button runs both requests again for that file.
+- **Remove.** Removing a chip cancels its upload if it is still running; a late result for it is ignored. The uploaded file stays in Storage (CONTRACT.md §4.14, Known limits).
+- **Send while attaching.** Send is disabled while any chip is uploading or in error, or when the ready files are over 25 MB together. A quiet hint under the chips says why: "Uploading…", "Remove or retry the failed attachments", or "Attachments are over 25 MB together".
+- **Sending.** Send adds `attachmentIds`: the ready chips' IDs, in chip order. Without chips the field is left out.
+- **Drafts.** Autosave keeps saving text only. While any chip exists, a hint reads "Attachments aren't saved with drafts". Closing the drawer, by any route, cancels running uploads and drops the chips; restoring or opening a draft starts without attachments.
+- **Touch.** The paperclip button and each chip's remove and Retry buttons have 44px hit areas on touch screens, by the shared rule.
+
 ### Loading state
 
 - **Sending:**
@@ -297,7 +318,8 @@ The drawer is a modal dialog. While it is open the app behind it is inert (no cl
 For `POST /api/v1/messages/send`:
 - `UNAUTHENTICATED`: shared rule. The drawer content stays intact and the send is retried after re-authentication.
 - `GMAIL_NOT_CONNECTED`, `GMAIL_TOKEN_REVOKED`: the drawer stays open with its content saved to the local snapshot, and the reconnect panel opens.
-- `VALIDATION_FAILED`: each entry in `details.issues` is shown inline under its field (`to`, `subject`, `body` or `threadId`).
+- `VALIDATION_FAILED`: each entry in `details.issues` is shown inline under its field (`to`, `subject`, `body` or `threadId`). *v1.3:* an issue on `attachmentIds[i]` marks that chip as "Upload failed" (with Retry), and Send stays disabled until it is retried or removed.
+- `FILE_TOO_LARGE` (*v1.3*): a banner "These attachments are over 25 MB together". Nothing was sent.
 - `MESSAGE_NOT_FOUND`: the `threadId` no longer exists. An inline prompt reads "This conversation no longer exists. Send as a new message?", and confirming clears `threadId` and retries.
 - `GMAIL_RATE_LIMITED`: the drawer stays open, and Send is disabled with a `Retry-After` countdown.
 - `GMAIL_UPSTREAM_ERROR`, `INTERNAL`:

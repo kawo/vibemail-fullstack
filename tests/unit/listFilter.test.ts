@@ -10,6 +10,7 @@ import { parseListQuery } from '../../src/messages/list';
 import { createFakeProviderFactory, fakeMessage } from '../fakes/fakeProvider';
 import { FakeSessions } from '../fakes/fakeSessions';
 import { MemoryMessages, MemoryUsers } from '../fakes/memoryRepos';
+import { MemoryAttachmentStore, MemoryAttachments } from '../fakes/memoryAttachments';
 
 const SECRET = 'test-jwt-secret-at-least-32-characters!!';
 const SUPABASE = 'https://proj.supabase.co';
@@ -67,6 +68,8 @@ describe('GET /api/v1/messages?label= (CONTRACT.md §4.2)', () => {
       users,
       messages,
       sessions: new FakeSessions({ userId: USER, email: EMAIL }),
+      attachments: new MemoryAttachments(),
+      attachmentStore: new MemoryAttachmentStore(),
       jwtSecret: SECRET,
       supabaseUrl: SUPABASE,
       frontendUrl: 'https://app.vibemail.test',
