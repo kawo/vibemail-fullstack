@@ -43,7 +43,6 @@
   ],
   "exclude": [
     "node_modules",
-    "api",
     "src",
     "tests",
     "supabase",

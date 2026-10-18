@@ -1,4 +1,4 @@
-import { handlers } from '../../../src/http';
+import { handlers } from '../../../http';
 
 /** GET /api/v1/messages — CONTRACT.md §4.2 (bearer). */
 export const GET = handlers.listMessages;

@@ -22,8 +22,9 @@ Any change to an endpoint, an `ErrorCode` or a stored field goes into `CONTRACT.
 - **Database:** the Supabase JS client, using a single service-role client. There is no anon key.
 - **Auth tokens:** `jsonwebtoken` verifies Supabase access tokens.
 - **Tests:** Jest via `ts-jest`, plus `supertest`. `supertest` needs a small adapter, because the handlers take a Web `Request` rather than a Node `http.Server`.
-- **Deployment:** the engine's handlers live in top-level `api/`; each file exports `GET`/`POST(request: Request): Promise<Response>` on the Node.js runtime (never Edge). Next.js route files re-export them, so one project serves the engine and the web client (see Web client). `maxDuration` lives in those route files; `vercel.json` holds only the cron job.
-- **Two tsconfigs.** `tsconfig.json` keeps `rootDir: ./src` while also including `api/`, so plain `tsc` fails with TS6059. Never run bare `tsc`; Next.js compiles `api/` through the route re-exports.
+- **Deployment:** the engine's handlers live in `src/endpoints/`; each file exports `GET`/`POST(request: Request): Promise<Response>` on the Node.js runtime (never Edge). Next.js route files re-export them, so one project serves the engine and the web client (see Web client). `maxDuration` lives in those route files; `vercel.json` holds only the cron job.
+- **Never add a top-level `api/` folder.** Vercel builds it as standalone functions even under the Next.js preset, on the same output paths as the grouped Next.js route functions, and they replace each other: routes then run another route's handler (`docs/deploy-routing-issue.md`). `tests/unit/nextRoutes.test.ts` guards this.
+- **Two tsconfigs.** `tsconfig.json` is the base config (`rootDir: ./src`). Never run bare `tsc`; Next.js compiles `src/endpoints/` through the route re-exports.
   - **Type-checking:** always via `tsconfig.check.json`, which extends the base config with `rootDir: "."`, `noEmit`, `tests/`, and `types: ["node", "jest"]`. TypeScript 6 no longer loads `@types/*` packages automatically.
   - **Target is ES2020:** there is no `Error.cause` or other ES2022 library API. Declare such fields explicitly (see `ProviderError`).
   - **Jest:** `jest.config.js` (CommonJS; a `.ts` config fails to load as an ES module) points ts-jest at `tsconfig.check.json`.
@@ -34,7 +35,7 @@ Any change to an endpoint, an `ErrorCode` or a stored field goes into `CONTRACT.
 The VibeMail Glass web client is a Next.js 15 (App Router) + React 19 app at the repo root, beside the engine. One Next.js project serves both on one origin: the client calls the engine only over CONTRACT.md §4, by relative path (`/api/v1/...`), with the JWT bearer from the Supabase session kept in `localStorage`. There is no sample data and no offline mode.
 
 - **Layout:** `app/` holds the client routes (`auth/`, `auth/callback/`, `(mail)/inbox`, `(mail)/thread/[threadId]`) and, beside them, `app/components/` (the UI: one `MessageRow`; `ComposeDrawer` with a `mode` prop), `app/lib/` (pure logic and its tests), `app/services/` (the data layer, `DataSource`, served by `httpSource`) and `app/styles/` (the glass CSS and design-system tokens). Those four folders have no `page` or `route` file, so they are never routable; never name a file in them after a Next.js special file (`layout`, `page`, `route`, `loading`, `error`, `template`, `not-found`, `default`), which is why the breakpoints live in `app/lib/breakpoints.ts`. At the root, `state/` holds the client stores, including one server-filtered list per label. Imports use `@/app/…` and `@/state/…`.
-- **Engine routes:** `app/api/**/route.ts` and `app/webhook/gmail/route.ts` are one-line re-exports of the `api/` handlers (plus `runtime = 'nodejs'` and, where needed, `maxDuration`). They are the only client-side files that import engine code; `tests/unit/nextRoutes.test.ts` checks each `api/` handler has its route. A new engine endpoint needs its route file too.
+- **Engine routes:** `app/api/**/route.ts` and `app/webhook/gmail/route.ts` are one-line re-exports of the `src/endpoints/` handlers (plus `runtime = 'nodejs'` and, where needed, `maxDuration`). They are the only client-side files that import engine code; `tests/unit/nextRoutes.test.ts` checks each `src/endpoints/` handler has its route. A new engine endpoint needs its route file too.
 - **Config:** `next.config.ts`, `tsconfig.next.json` (Next type-checks with this, never with the engine's `tsconfig.json`) and `vitest.config.mts`. The client needs `NEXT_PUBLIC_SUPABASE_URL` and the public `NEXT_PUBLIC_SUPABASE_ANON_KEY` to keep and refresh the session; the engine's "no anon key" rule is about DB access.
 - **Commands:** `npm run web:dev` (port 3001: the client and every engine endpoint; `FRONTEND_URL` and the `GOOGLE_REDIRECT_URI` origin are `http://localhost:3001`), `web:build`, `web:start`, `web:test` (Vitest) and `web:typecheck`.
 - **Shared files:** root `package.json`, `package-lock.json`, `.gitignore`, `.env.example` and `vercel.json` carry both. They are server-session-owned.
@@ -59,7 +60,7 @@ npm run db:push                     # pushes migrations to the hosted project; o
 
 | Session | Branch | Owns | Never writes |
 |---|---|---|---|
-| Server logic | `main` | `api/`, `src/` except `src/types/` (including `src/db/`), `tests/`, `vercel.json`, `package.json` | `supabase/migrations/`, `src/types/` |
+| Server logic | `main` | `src/` except `src/types/` (including `src/db/`), `tests/`, `vercel.json`, `package.json` | `supabase/migrations/`, `src/types/` |
 | Schema | `schema` | `supabase/migrations/`, `src/types/` | everything else, especially `src/db/` |
 
 Migrations live in `supabase/migrations/`, because that is the only directory the Supabase CLI applies.
@@ -98,7 +99,7 @@ With the Supabase GitHub integration, merging into `main` runs the migration on 
   - Tokens are verified with `jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'], audience: 'authenticated', issuer: SUPABASE_URL + '/auth/v1' })`. The algorithm allow-list is mandatory.
   - `userId` comes only from the token's `sub`.
 - **Machine endpoints** are outside `/api/v1` and don't use the user JWT:
-  - The Pub/Sub webhook is at **`/webhook/gmail`**, implemented in `api/webhook/gmail.ts` and served at that path by `app/webhook/gmail/route.ts`. It authenticates with a `?token=` query parameter equal to `GOOGLE_PUBSUB_VERIFICATION_TOKEN`, compared in constant time.
+  - The Pub/Sub webhook is at **`/webhook/gmail`**, implemented in `src/endpoints/webhook/gmail.ts` and served at that path by `app/webhook/gmail/route.ts`. It authenticates with a `?token=` query parameter equal to `GOOGLE_PUBSUB_VERIFICATION_TOKEN`, compared in constant time.
   - The cron job is at `/api/cron/renew-watch` and authenticates with the `CRON_SECRET` bearer.
 - **Account table:** `users`, keyed by `google_id` (the token-info `sub`), with a unique `user_id` linking it to the Supabase user. The connect upsert is `ON CONFLICT (google_id)` guarded by `user_id` (CONTRACT.md §5.2).
 - **Tenant isolation:** the service-role client bypasses RLS, so every user-scoped query lives in `src/db/` and filters on `user_id`.

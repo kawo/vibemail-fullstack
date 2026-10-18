@@ -1,4 +1,4 @@
 /** `/api/v1/drafts`: the engine's handler (api/v1/drafts/index.ts), served by Next.js. */
-export { GET, POST, OPTIONS } from '../../../../api/v1/drafts/index';
+export { GET, POST, OPTIONS } from '../../../../src/endpoints/v1/drafts/index';
 
 export const runtime = 'nodejs';

@@ -1,4 +1,4 @@
-import { handlers } from '../../../src/http';
+import { handlers } from '../../../http';
 
 /** PATCH and DELETE /api/v1/drafts/{draftId} — CONTRACT.md §4.11, §4.12 (bearer). */
 export const PATCH = handlers.updateDraft;

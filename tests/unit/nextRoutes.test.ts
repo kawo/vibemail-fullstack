@@ -1,9 +1,9 @@
 /**
- * One Next.js project serves the engine: every api/ handler has a route file at the same public
+ * One Next.js project serves the engine: every src/endpoints/ handler has a route file at the same public
  * path that re-exports exactly its HTTP methods, on the Node.js runtime, with the durations that
  * vercel.json used to set.
  */
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -16,17 +16,22 @@ function walk(dir: string): string[] {
   });
 }
 
-/** api/v1/messages/index.ts → app/api/v1/messages/route.ts; api/webhook/gmail.ts → app/webhook/gmail/route.ts. */
+/** src/endpoints/v1/messages/index.ts → app/api/v1/messages/route.ts; src/endpoints/webhook/gmail.ts → app/webhook/gmail/route.ts. */
 function routeFor(apiFile: string): string {
-  const rel = path.relative(path.join(ROOT, 'api'), apiFile).replace(/\\/g, '/').replace(/\.ts$/, '');
+  const rel = path.relative(path.join(ROOT, 'src', 'endpoints'), apiFile).replace(/\\/g, '/').replace(/\.ts$/, '');
   const routePath = rel.endsWith('/index') ? rel.slice(0, -'/index'.length) : rel;
   const base = routePath.startsWith('webhook/') ? path.join(ROOT, 'app') : path.join(ROOT, 'app', 'api');
   return path.join(base, routePath, 'route.ts');
 }
 
-const apiFiles = walk(path.join(ROOT, 'api'));
+const apiFiles = walk(path.join(ROOT, 'src', 'endpoints'));
 
 describe('Next.js route re-exports of the engine', () => {
+  // Vercel builds a top-level api/ folder as standalone functions even under the Next.js preset.
+  // Those land on the same output paths as the grouped Next.js route functions and replace them,
+  // so routes run another route's handler (docs/deploy-routing-issue.md).
+  it('keeps no top-level api/ folder', () => expect(existsSync(path.join(ROOT, 'api'))).toBe(false));
+
   it('finds every engine handler', () => expect(apiFiles).toHaveLength(12));
 
   it.each(apiFiles.map((f) => [path.relative(ROOT, f).replace(/\\/g, '/'), f]))('%s has a matching route', async (_name, apiFile) => {
@@ -41,9 +46,9 @@ describe('Next.js route re-exports of the engine', () => {
   });
 
   it.each([
-    ['api/v1/auth/google/callback.ts', 60],
-    ['api/webhook/gmail.ts', 60],
-    ['api/cron/renew-watch.ts', 300],
+    ['src/endpoints/v1/auth/google/callback.ts', 60],
+    ['src/endpoints/webhook/gmail.ts', 60],
+    ['src/endpoints/cron/renew-watch.ts', 300],
   ])('%s keeps maxDuration %i', async (apiFile, seconds) => {
     const route = (await import(routeFor(path.join(ROOT, apiFile)))) as Record<string, unknown>;
     expect(route.maxDuration).toBe(seconds);
