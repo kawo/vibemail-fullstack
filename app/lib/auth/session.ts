@@ -1,6 +1,6 @@
 import { GoTrueClient } from '@supabase/auth-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/app/lib/config';
-import { type CallbackResult, type CallbackTokens, parseCallback } from './callback';
+import { type CallbackResult, type CallbackTokens, SESSION_EXPIRED, parseCallback } from './callback';
 
 /**
  * The signed-in session: the Supabase session the sign-in callback hands over (CONTRACT.md
@@ -14,6 +14,11 @@ export interface AppSession {
 
 let client: GoTrueClient | null = null;
 let warned = false;
+
+/** Where supabase-js and this client keep the session (the JWTs) in localStorage. */
+function storageKey(): string {
+  return `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
+}
 
 /**
  * Only Supabase Auth is needed (keep, refresh, sign out), so this uses the standalone client.
@@ -33,7 +38,7 @@ function supabase(): GoTrueClient | null {
       url: `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1`,
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
       // The key supabase-js would use, so a session survives switching clients.
-      storageKey: `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`,
+      storageKey: storageKey(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
@@ -115,7 +120,48 @@ export async function refreshSession(): Promise<AppSession | null> {
   return { accessToken: data.session.access_token, email: data.session.user.email ?? null };
 }
 
-export async function signOut(): Promise<void> {
-  await supabase()?.signOut({ scope: 'local' });
-  signedOut();
+/** Why the session ended: the user signed out, or the engine rejected it (401) and refresh failed. */
+export type SignOutReason = 'user' | 'expired';
+
+export function signInPath(reason: SignOutReason): string {
+  return reason === 'expired' ? `/auth?code=UNAUTHENTICATED&reason=${SESSION_EXPIRED}` : '/auth';
+}
+
+/** Removes the stored session even when the Supabase client couldn't (it keeps it on some errors). */
+function clearStoredSession(): void {
+  if (!SUPABASE_URL) {
+    return;
+  }
+  const key = storageKey();
+  try {
+    for (const name of [key, `${key}-user`, `${key}-code-verifier`]) {
+      window.localStorage.removeItem(name);
+    }
+  } catch {
+    // No storage access: nothing was stored there either.
+  }
+}
+
+let ending: Promise<void> | null = null;
+
+/**
+ * Ends the session on this device and leaves the mail screens: clears the stored JWTs, tells the
+ * listeners (the store drops cached mail), then replaces the page with the sign-in page, which
+ * explains an expired session. Concurrent calls (several requests failing with 401 at once) share
+ * one sign-out.
+ */
+export function signOut(reason: SignOutReason = 'user'): Promise<void> {
+  ending ??= (async () => {
+    try {
+      await supabase()?.signOut({ scope: 'local' });
+    } catch {
+      // Cleared below either way.
+    }
+    clearStoredSession();
+    signedOut();
+    window.location.replace(signInPath(reason));
+  })().finally(() => {
+    ending = null;
+  });
+  return ending;
 }

@@ -40,6 +40,9 @@ export function parseCallback(search: string, hash: string): CallbackResult {
   };
 }
 
+/** The `reason` sign-out puts on the sign-in page after the engine rejected the session (401). */
+export const SESSION_EXPIRED = 'SESSION_EXPIRED';
+
 /** Plain-language text for a sign-in failure `code` / `reason` from the redirect. */
 export function signInMessage(code: string, reason?: string): string {
   if (code === 'GMAIL_NOT_CONNECTED') {
@@ -48,7 +51,9 @@ export function signInMessage(code: string, reason?: string): string {
       : 'VibeMail needs every requested Gmail permission. Please sign in again and allow them all.';
   }
   if (code === 'UNAUTHENTICATED') {
-    return 'That sign-in link expired. Please try again.';
+    return reason === SESSION_EXPIRED
+      ? 'Your session expired. Please sign in again.'
+      : 'That sign-in link expired. Please try again.';
   }
   if (code === 'GMAIL_RATE_LIMITED' || code === 'GMAIL_UPSTREAM_ERROR') {
     return 'Google is busy right now. Please try again in a moment.';

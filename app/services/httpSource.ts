@@ -50,7 +50,8 @@ async function send(method: string, path: string, token: string | undefined, opt
 
 /**
  * Every `/api/v1` call. On `UNAUTHENTICATED` it refreshes the session once and repeats the
- * request; if that fails it signs out. `GMAIL_NOT_CONNECTED` / `GMAIL_TOKEN_REVOKED` raise the
+ * request; if that fails it signs out, which clears the stored JWT and sends the user to the
+ * sign-in page with a session-expired message. `GMAIL_NOT_CONNECTED` / `GMAIL_TOKEN_REVOKED` raise the
  * reconnect signal. Errors are thrown as `ApiError`.
  */
 async function call<T>(method: string, path: string, options: CallOptions = {}): Promise<T> {
@@ -61,13 +62,13 @@ async function call<T>(method: string, path: string, options: CallOptions = {}):
     if (error.code === 'UNAUTHENTICATED') {
       session = await refreshSession();
       if (!session) {
-        await signOut();
+        await signOut('expired');
         emitApiSignal('signed-out');
         throw error;
       }
       response = await send(method, path, session.accessToken, options);
       if (response.status === 401 && (await toApiError(response.clone())).code === 'UNAUTHENTICATED') {
-        await signOut();
+        await signOut('expired');
         emitApiSignal('signed-out');
       }
     }
