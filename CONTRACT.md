@@ -3,7 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself. Bearer verification also accepts tokens signed with the Supabase project's asymmetric signing keys (§3.1).
-> **v1.3 addition** (marked *Added in v1.3*, **not implemented yet**): attachments. `POST /api/v1/attachments` (§4.14) reserves an upload, which goes from the browser straight to Supabase Storage through a signed URL; `POST /api/v1/messages/send` takes `attachmentIds` (§4.3). New table and Storage bucket (§5.5) and a new error code, `FILE_TOO_LARGE` (§3.3).
+> **v1.3 addition** (marked *Added in v1.3*): attachments, implemented with the §5.5 migration and their tests. `POST /api/v1/attachments` (§4.14) reserves an upload, which goes from the browser straight to Supabase Storage through a signed URL; `POST /api/v1/messages/send` takes `attachmentIds` (§4.3). New table and Storage bucket (§5.5) and a new error code, `FILE_TOO_LARGE` (§3.3).
 > Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -947,7 +947,7 @@ interface ListDraftsResponse {
 | `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
 | `INTERNAL` | 500 | An unexpected exception. |
 
-### 4.14 Upload an attachment — `POST /api/v1/attachments` (*Added in v1.3, not implemented yet*)
+### 4.14 Upload an attachment — `POST /api/v1/attachments` (*Added in v1.3*)
 
 Reserves an attachment for the signed-in user and returns a short-lived signed URL. The browser then uploads the file **straight to Supabase Storage** with that URL. Function file: `src/endpoints/v1/attachments/index.ts`, served by `app/api/v1/attachments/route.ts`.
 
@@ -1119,7 +1119,7 @@ OAuth tokens are encrypted in application code before they reach the database. T
 - **Columns:** `users.refresh_token` and `users.access_token`. Only `src/db/` encrypts and decrypts, and plaintext tokens never leave the server process.
 - **Integrity:** a decryption failure (wrong key, or a tampered value) is treated as revoked: `GMAIL_TOKEN_REVOKED`.
 
-### 5.5 `attachments` — one uploaded file (*Added in v1.3, not implemented yet*)
+### 5.5 `attachments` — one uploaded file (*Added in v1.3*)
 
 One row per reservation from §4.14. The file itself lives in Supabase Storage, not in Postgres.
 
