@@ -84,7 +84,7 @@ export function createHandlers(getDeps: () => AppDeps): Handlers {
       try {
         const deps = getDeps();
         cors = corsHeaders(deps.frontendUrl);
-        const user = requireUser(request, { jwtSecret: deps.jwtSecret, supabaseUrl: deps.supabaseUrl });
+        const user = await requireUser(request, { jwtSecret: deps.jwtSecret, supabaseUrl: deps.supabaseUrl, signingKeys: deps.signingKeys });
         const response = await run(deps, user, request);
         for (const [name, value] of Object.entries(cors)) {
           response.headers.set(name, value);
