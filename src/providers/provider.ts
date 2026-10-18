@@ -120,6 +120,13 @@ export interface ProviderMessage {
 }
 
 /** A message to send. The implementation builds the wire format (e.g. RFC 2822 MIME). */
+/** A file sent with a message (CONTRACT.md §4.3, v1.3). */
+export interface OutgoingAttachment {
+  filename: string;
+  mimeType: string;
+  content: Buffer;
+}
+
 export interface OutgoingMessage {
   from: string;
   to: string[];
@@ -133,6 +140,8 @@ export interface OutgoingMessage {
   threadId?: string;
   inReplyTo?: string;
   references?: string;
+  /** v1.3: sent as `multipart/mixed` parts after the body, in this order. */
+  attachments?: OutgoingAttachment[];
 }
 
 /** One mailbox change since a cursor. Label changes are deltas, not full label sets. */

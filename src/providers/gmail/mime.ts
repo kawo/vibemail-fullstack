@@ -1,4 +1,4 @@
-import type { OutgoingMessage } from '../provider';
+import type { OutgoingAttachment, OutgoingMessage } from '../provider';
 
 /**
  * RFC 2822 message builder for Gmail `messages.send` (CONTRACT.md §4.3). Pure: no I/O.
@@ -48,6 +48,69 @@ function base64Body(text: string): string {
   return (Buffer.from(text, 'utf8').toString('base64').match(/.{1,76}/g) ?? ['']).join(CRLF);
 }
 
+/** A fresh MIME boundary. */
+function boundary(): string {
+  return `vibemail-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
+/**
+ * The message content after the top-level headers: its own Content-* headers, a blank line and
+ * the body, ending in an empty line. Plain text, HTML, or both as multipart/alternative.
+ */
+function contentLines(message: OutgoingMessage): string[] {
+  const text = message.text ?? (message.html === undefined ? '' : undefined);
+  if (text !== undefined && message.html !== undefined) {
+    const b = boundary();
+    return [
+      `Content-Type: multipart/alternative; boundary="${b}"`,
+      '',
+      `--${b}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Body(text),
+      `--${b}`,
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Body(message.html),
+      `--${b}--`,
+      '',
+    ];
+  }
+  const html = text === undefined ? (message.html ?? '') : undefined;
+  return [
+    `Content-Type: ${html === undefined ? 'text/plain' : 'text/html'}; charset=UTF-8`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64Body(html ?? text ?? ''),
+    '',
+  ];
+}
+
+/**
+ * A Content-Type / Content-Disposition file-name parameter: a quoted string when the name is
+ * printable ASCII, else RFC 2231 `name*=UTF-8''<percent-encoded>`. Control characters are dropped.
+ */
+export function fileParam(param: 'name' | 'filename', filename: string): string {
+  const clean = filename.replace(/[\u0000-\u001f\u007f]/g, '');
+  if (ASCII_PRINTABLE.test(clean)) {
+    return `${param}="${clean.replace(/[\\"]/g, '\\$&')}"`;
+  }
+  const encoded = encodeURIComponent(clean).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${param}*=UTF-8''${encoded}`;
+}
+
+function attachmentLines(attachment: OutgoingAttachment): string[] {
+  return [
+    `Content-Type: ${attachment.mimeType}; ${fileParam('name', attachment.filename)}`,
+    `Content-Disposition: attachment; ${fileParam('filename', attachment.filename)}`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    (attachment.content.toString('base64').match(/.{1,76}/g) ?? ['']).join(CRLF),
+  ];
+}
+
 /** Builds the RFC 2822 message. Callers validate addresses and reject CR/LF in headers first. */
 export function buildRfc2822(message: OutgoingMessage, date: Date = new Date()): string {
   const headers = [
@@ -62,35 +125,20 @@ export function buildRfc2822(message: OutgoingMessage, date: Date = new Date()):
     ...(message.references ? [`References: ${message.references}`] : []),
     'MIME-Version: 1.0',
   ];
-
-  const text = message.text ?? (message.html === undefined ? '' : undefined);
-  if (text !== undefined && message.html !== undefined) {
-    const boundary = `vibemail-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-    return [
-      ...headers,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      base64Body(text),
-      `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      base64Body(message.html),
-      `--${boundary}--`,
-      '',
-    ].join(CRLF);
+  const attachments = message.attachments ?? [];
+  if (attachments.length === 0) {
+    return [...headers, ...contentLines(message)].join(CRLF);
   }
-  const html = text === undefined ? (message.html ?? '') : undefined;
+  // v1.3 (CONTRACT.md §4.3): the body first, then one part per file, in order.
+  const b = boundary();
   return [
     ...headers,
-    `Content-Type: ${html === undefined ? 'text/plain' : 'text/html'}; charset=UTF-8`,
-    'Content-Transfer-Encoding: base64',
+    `Content-Type: multipart/mixed; boundary="${b}"`,
     '',
-    base64Body(html ?? text ?? ''),
+    `--${b}`,
+    ...contentLines(message),
+    ...attachments.flatMap((attachment) => [`--${b}`, ...attachmentLines(attachment)]),
+    `--${b}--`,
     '',
   ].join(CRLF);
 }
