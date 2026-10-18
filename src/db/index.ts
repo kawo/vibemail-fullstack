@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types';
+import { type AttachmentsRepository, createAttachmentsRepository } from './attachments';
 import { getServiceClient } from './client';
 import { keyFromEnv } from './crypto';
 import { type MessagesRepository, createMessagesRepository } from './messages';
@@ -16,10 +17,12 @@ import { type UsersRepository, createUsersRepository } from './users';
  *   users.updateUserTokens(userId, update)             token persistence listener target; encrypts before writing
  *   users.updateHistoryId(userId, historyId, at)       after each sync
  *   users.updateWatchExpiry(userId, expiresAt)         after a watch registration or renewal
+ *   attachments.create / getMany / delete              uploads reserved by POST /api/v1/attachments (§5.5)
  */
 export interface Db {
   users: UsersRepository;
   messages: MessagesRepository;
+  attachments: AttachmentsRepository;
 }
 
 export function createDb(
@@ -29,9 +32,11 @@ export function createDb(
   return {
     users: createUsersRepository(client, encryptionKey),
     messages: createMessagesRepository(client),
+    attachments: createAttachmentsRepository(client),
   };
 }
 
+export { type AttachmentRow, type AttachmentsRepository, type NewAttachment, createAttachmentsRepository } from './attachments';
 export { getServiceClient } from './client';
 export { TokenDecryptionError, decryptToken, encryptToken, keyFromEnv } from './crypto';
 export {

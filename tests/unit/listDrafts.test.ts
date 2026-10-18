@@ -9,6 +9,7 @@ import { ProviderError } from '../../src/providers/provider';
 import { createFakeProviderFactory } from '../fakes/fakeProvider';
 import { FakeSessions } from '../fakes/fakeSessions';
 import { MemoryMessages, MemoryUsers } from '../fakes/memoryRepos';
+import { MemoryAttachmentStore, MemoryAttachments } from '../fakes/memoryAttachments';
 
 const SECRET = 'test-jwt-secret-at-least-32-characters!!';
 const SUPABASE = 'https://proj.supabase.co';
@@ -43,6 +44,8 @@ function setup(connected = true) {
     users,
     messages: new MemoryMessages(),
     sessions: new FakeSessions({ userId: USER, email: EMAIL }),
+    attachments: new MemoryAttachments(),
+    attachmentStore: new MemoryAttachmentStore(),
     jwtSecret: SECRET,
     supabaseUrl: SUPABASE,
     frontendUrl: 'https://app.vibemail.test',

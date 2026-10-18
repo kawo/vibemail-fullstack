@@ -20,6 +20,7 @@ import { createHandlers } from '../../src/http/handlers';
 import { GMAIL_MODIFY_SCOPE, GMAIL_SEND_SCOPE } from '../../src/providers/gmail/auth';
 import type { ProviderMessage, VerifiedGrant } from '../../src/providers/provider';
 import { toMessageRow } from '../../src/db/messages';
+import { createAttachmentStore } from '../../src/storage/attachments';
 import type { Database } from '../../src/types';
 import { type FakeMailbox, createFakeMailbox, createFakeProviderFactory, cursor } from '../fakes/fakeProvider';
 import { FakeSessions } from '../fakes/fakeSessions';
@@ -151,6 +152,7 @@ export function buildApp(
   const deps: AppDeps = {
     factory,
     ...createDb(db, ENCRYPTION_KEY),
+    attachmentStore: createAttachmentStore(db),
     sessions,
     jwtSecret: TEST_JWT_SECRET,
     supabaseUrl: liveConfig().url,
