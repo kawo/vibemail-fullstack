@@ -3,7 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself. Bearer verification also accepts tokens signed with the Supabase project's asymmetric signing keys (§3.1).
-> **v1.3 addition** (marked *Added in v1.3*, **not implemented yet**): attachment upload, `POST /api/v1/attachments` (§4.14), with the `attachments` table and Storage bucket (§5.5). The file goes from the browser straight to Supabase Storage through a signed URL.
+> **v1.3 addition** (marked *Added in v1.3*, **not implemented yet**): attachments. `POST /api/v1/attachments` (§4.14) reserves an upload, which goes from the browser straight to Supabase Storage through a signed URL; `POST /api/v1/messages/send` takes `attachmentIds` (§4.3). New table and Storage bucket (§5.5) and a new error code, `FILE_TOO_LARGE` (§3.3).
 > Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -29,11 +29,11 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
   - creating, updating and deleting Gmail drafts (§4.10–§4.12);
   - listing the user's Gmail drafts, read from Gmail on request (§4.13).
   - Filtering by label happens in the client, on `status`, `isStarred` and `labelIds`; there is no filter endpoint.
-- *Added in v1.3:* uploading an attachment of up to 25 MB, reserved by the API and stored in Supabase Storage (§4.14).
+- *Added in v1.3:* uploading an attachment of up to 25 MB, reserved by the API and stored in Supabase Storage (§4.14), and sending a message with uploaded attachments, up to 25 MB together (§4.3).
 
 **Out of scope (v1)**
 
-- Attachments on send and on drafts. From v1.3 a file can be uploaded (§4.14), but no endpoint attaches it to a message yet. Stored attachment *metadata* on received mail is in scope.
+- Attachments on drafts: a draft carries text only, even when the message being written has attachments. Stored attachment *metadata* on received mail is in scope.
 - Downloading attachments, uploaded or received, and cleaning up unused uploads.
 - File uploads through a function: Vercel Functions take at most 4.5 MB of request body, so files go to Storage directly (§4.14).
 - Server-side label/unread filters.
@@ -149,6 +149,7 @@ type ErrorCode =
   | 'SYNC_FAILED'
   | 'METHOD_NOT_ALLOWED'
   | 'CONFIG_ERROR'
+  | 'FILE_TOO_LARGE'   // Added in v1.3
   | 'INTERNAL';
 
 interface ErrorResponse {
@@ -173,6 +174,7 @@ interface ErrorResponse {
 | `SYNC_FAILED` | 502 | true | Reserved. Webhook syncs run after the ack (§4.5), so their failures are logged, not returned. |
 | `METHOD_NOT_ALLOWED` | 405 | false | The OAuth endpoints (§4.1) received a method other than `GET`. Sets the `Allow: GET` header. |
 | `CONFIG_ERROR` | 500 | false | The OAuth endpoints (§4.1) are missing a required environment variable. Other endpoints report this as `INTERNAL` (§3.6). |
+| `FILE_TOO_LARGE` | 413 | false | *Added in v1.3.* A file is over 25 MB (§4.14, `details: { maxBytes, size }`), or a message's attachments are over 25 MB together (§4.3, `details: { maxBytes, totalBytes }`). `maxBytes` is `26214400`. |
 | `INTERNAL` | 500 | false | Unhandled server or DB error. |
 
 ### 3.4 `MessageDTO`
@@ -437,7 +439,7 @@ interface ListMessagesResponse {
 
 ### 4.3 Message send — `POST /api/v1/messages/send`
 
-Sends a plain-text message through Gmail, optionally into an existing thread, then stores the sent message. Implemented in `src/send/index.ts`.
+Sends a plain-text message through Gmail, optionally into an existing thread and, *from v1.3*, with uploaded attachments (§4.14), then stores the sent message. Implemented in `src/send/index.ts`.
 
 **Request** — `Content-Type: application/json`
 
@@ -447,6 +449,7 @@ interface SendMessageRequest {
   subject: string;        // may be ""; max 998 chars, no CR/LF
   body: string;           // plain text (text/plain; charset=UTF-8)
   threadId?: string;      // a Gmail thread ID in this user's mailbox, passed to Gmail as-is
+  attachmentIds?: string[]; // Added in v1.3: IDs from §4.14; at most 20, each a UUID, no duplicates
 }
 ```
 
@@ -456,16 +459,24 @@ Validation rules (`VALIDATION_FAILED` with `details.issues` listing every failur
 - `subject` contains no CR or LF (header injection) and is at most 998 characters.
 - `body` is a string. An empty body is allowed.
 - `threadId`, when present, is a non-empty string of letters and digits.
+- *Added in v1.3:* `attachmentIds`, when present, is an array of at most 20 distinct UUIDs (issues on `attachmentIds` or `attachmentIds[i]`).
 
 **Behavior**
 
 1. Authenticate (§3.1), then load the user's credentials and account email from `users`.
+   - *Added in v1.3, when `attachmentIds` is non-empty:* before any Gmail call, load the user's `attachments` rows for those IDs (filtered on `user_id`, §5.3) and read each Storage object at its `storage_path` with the service role.
+     - An ID with no row for this user (unknown, or another user's) → `VALIDATION_FAILED`, issue `attachmentIds[i]` "unknown attachment".
+     - A row whose object doesn't exist yet → `VALIDATION_FAILED`, issue `attachmentIds[i]` "not uploaded yet".
+     - The sum of the **stored** objects' sizes over 26,214,400 bytes → `FILE_TOO_LARGE` with `details: { maxBytes: 26214400, totalBytes }`. The declared `size` of §4.14 is not used.
+     - All of these fail before anything is sent.
 2. Build an RFC 2822 message (`src/providers/gmail/mime.ts`, behind `MailProvider.sendMessage`):
    - Headers: `From: <users.email>`, `To`, `Subject`, `Date`, `MIME-Version: 1.0`.
    - The subject is RFC 2047-encoded when it isn't ASCII.
    - The body is a single `text/plain; charset=UTF-8` part, base64 content-transfer-encoded.
    - Lines end in CRLF.
+   - *Added in v1.3, with attachments:* the message is `multipart/mixed`: the text part first, then one part per attachment, in `attachmentIds` order, with `Content-Type` the stored object's content type (`application/octet-stream` when it has none), `Content-Disposition: attachment` with the row's `filename` (RFC 2231 `filename*=UTF-8''…` when it isn't ASCII), base64 content-transfer-encoded.
 3. Call `users.messages.send({ userId: 'me', requestBody: { raw: base64url(mime), threadId? } })`.
+   - *Added in v1.3, with attachments:* the message is sent by media upload instead (`media: { mimeType: 'message/rfc822', body: mime }`, `requestBody: { threadId? }`), which Gmail accepts up to 35 MB; base64 makes 25 MB of attachments about 34 MB.
    - `threadId` is passed through unchanged. No `In-Reply-To` / `References` headers are derived and the subject is not rewritten.
    - Gmail itself files the message in that thread, but recipients' mail clients may not thread it unless the subject matches.
 4. `messages.send` returns only `id`, `threadId` and `labelIds`. So call `users.messages.get({ id, format: 'full' })`, normalize it with the same parser as sync (§5.1), and upsert the row on `(user_id, gmail_id)`.
@@ -487,9 +498,12 @@ interface SendMessageResponse {
 | `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
 | `VALIDATION_FAILED` | 400 | Body is not JSON, or it fails any rule above (`details.issues` lists them). |
 | `MESSAGE_NOT_FOUND` | 404 | Gmail rejected `threadId` as not found in this mailbox (`details: { threadId }`). |
+| `FILE_TOO_LARGE` | 413 | *v1.3:* the attachments are over 25 MB together (`details: { maxBytes, totalBytes }`). |
 | `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
 | `GMAIL_UPSTREAM_ERROR` | 502 | Gmail send/get returned 5xx or an unexpected 4xx. |
-| `INTERNAL` | 500 | DB error or an unexpected exception. |
+| `INTERNAL` | 500 | DB error, a Storage read failure, or an unexpected exception. |
+
+Uploaded attachments are kept after the message is sent (§4.14, Known limits).
 
 If `send` succeeds but the follow-up `get` or upsert fails, the endpoint still returns an error (`GMAIL_UPSTREAM_ERROR` or `INTERNAL`) with `details: { sentGmailId }`, so that the client does not resend. The next sync will pick up the message.
 
@@ -939,7 +953,7 @@ Reserves an attachment for the signed-in user and returns a short-lived signed U
 
 **Why the file doesn't pass through this endpoint.** Vercel Functions accept at most 4.5 MB of request body; a larger request is rejected with `413` before the handler runs. A multipart upload of a 25 MB file to a function is therefore impossible. This endpoint takes only the file's metadata (a few hundred bytes); the bytes go to Storage, which enforces the size limit itself.
 
-This version only reserves and stores uploads. Attaching them to a sent message (§4.3) or a draft (§4.10, §4.11) is a later change; until then those endpoints are unchanged and no endpoint reads an upload back.
+Uploads are attached to a message by passing their IDs to send (§4.3). Drafts (§4.10, §4.11) don't carry attachments.
 
 **Request:** JSON body.
 
@@ -952,15 +966,15 @@ interface AttachmentUploadRequest {
 ```
 
 **Limit: 25 MB per file** (26,214,400 bytes), Gmail's attachment limit. It is enforced twice:
-- here, on the declared `size` → `VALIDATION_FAILED` before anything is reserved;
+- here, on the declared `size` → `FILE_TOO_LARGE` before anything is reserved;
 - by the Storage bucket's `file_size_limit` (§5.5), on the bytes actually uploaded. The client can't get round the limit by declaring a smaller `size`.
 
-The declared `size` and `mimeType` are informational. When a later change reads an upload, it must use the stored object's real size and type from Storage, not these values.
+The declared `size` and `mimeType` are informational. Send (§4.3) uses the stored object's real size and type from Storage, not these values.
 
 **Behavior**
 
 1. Authenticate (§3.1). Gmail is not involved: the account doesn't need to be connected, and no Gmail call is made.
-2. Validate the body. The first failing field is reported as `details: { field }`; a too-large `size` also carries `details: { maxBytes: 26214400 }`.
+2. Validate the body. The first failing field is reported as `VALIDATION_FAILED` with `details: { field }`. A `size` over 26,214,400 is `FILE_TOO_LARGE` with `details: { maxBytes: 26214400, size }`.
 3. Generate `attachmentId` (a UUID) and insert the `attachments` row (§5.5) with `user_id` from the token, the trimmed `filename`, `mimeType`, `size` and `storage_path = '{user_id}/{attachmentId}'`.
 4. Create a signed upload URL for that path in the private `attachments` bucket, with the service-role client (`storage.from('attachments').createSignedUploadUrl(storagePath)`). It is valid for 2 hours (Supabase's fixed lifetime) and for that one path only.
    - If this fails, the row from step 3 is deleted and the request fails `INTERNAL`.
@@ -992,16 +1006,18 @@ interface AttachmentUploadResponse {
 | Code | HTTP | Trigger |
 |---|---|---|
 | `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
-| `VALIDATION_FAILED` | 400 | Body is not JSON, or `filename`, `mimeType` or `size` fails a rule above (`details: { field }`; for `size` over the limit also `maxBytes`). |
+| `VALIDATION_FAILED` | 400 | Body is not JSON, or `filename`, `mimeType` or `size` fails a rule above (`details: { field }`). |
+| `FILE_TOO_LARGE` | 413 | `size` is over 26,214,400 bytes (`details: { maxBytes: 26214400, size }`). |
 | `INTERNAL` | 500 | The DB insert or the signed-URL request failed, or an unexpected exception. |
 
-No new `ErrorCode` is added. As on the other `/api/v1` endpoints, a method other than `POST` or the CORS `OPTIONS` preflight gets a plain `405`, not `METHOD_NOT_ALLOWED` (that code is for §4.1). Errors from the upload itself come from Storage, not from this API, and don't use the §3.3 envelope.
+`FILE_TOO_LARGE` is new in v1.3 (§3.3). As on the other `/api/v1` endpoints, a method other than `POST` or the CORS `OPTIONS` preflight gets a plain `405`, not `METHOD_NOT_ALLOWED` (that code is for §4.1). Errors from the upload itself come from Storage, not from this API, and don't use the §3.3 envelope.
 
 **Known limits (v1.3)**
 
 - **No clean-up.** Reservations that are never uploaded, and uploads that are never used, are kept. Removing them needs a scheduled job, which is out of scope (§1). Deleting a user removes their `attachments` rows (FK cascade), but **not** their Storage objects, which have no foreign key; those stay until removed by hand under `{user_id}/`.
 - **No quota.** There is no per-user limit on the number or total size of uploads.
 - **No download.** There is no endpoint to read an upload back, and no endpoint for attachments of received mail (§4.8 lists their metadata only).
+- **Kept after sending.** Sending (§4.3) leaves the row and the object in place.
 
 ---
 
