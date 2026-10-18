@@ -6,6 +6,7 @@ import {
   addFiles,
   attachmentIdsOf,
   failAttachments,
+  rejectedAttachmentIds,
   removeChip,
   retryChip,
   sendBlock,
@@ -92,6 +93,18 @@ describe('compose attachments (DESIGN_SPEC.md §3 Attachments)', () => {
   it('collects ids of ready chips in order', () => {
     const chips = [ready('a', 'id-a'), { ...ready('b', ''), state: 'uploading' as const, attachmentId: undefined }, ready('c', 'id-c')];
     expect(attachmentIdsOf(chips)).toEqual(['id-a', 'id-c']);
+  });
+
+  it('reads which sent attachment IDs the server rejected', () => {
+    const details = {
+      issues: [
+        { field: 'attachmentIds[1]', message: 'not uploaded yet' },
+        { field: 'subject', message: 'x' },
+        { field: 'attachmentIds[7]', message: 'out of range' },
+      ],
+    };
+    expect(rejectedAttachmentIds(details, ['id-a', 'id-b'])).toEqual(['id-b']);
+    expect(rejectedAttachmentIds(undefined, ['id-a'])).toEqual([]);
   });
 
   it('turns chips the server rejected on send into failed chips that upload again on retry', () => {

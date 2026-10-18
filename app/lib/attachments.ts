@@ -102,3 +102,13 @@ export function sendBlock(chips: readonly AttachmentChip[]): null | 'uploading' 
 export function attachmentIdsOf(chips: readonly AttachmentChip[]): string[] {
   return chips.flatMap((chip) => (chip.state === 'ready' && chip.attachmentId ? [chip.attachmentId] : []));
 }
+
+/** The sent IDs named by `attachmentIds[i]` issues in a send's VALIDATION_FAILED details. */
+export function rejectedAttachmentIds(details: Record<string, unknown> | undefined, sentIds: readonly string[]): string[] {
+  const issues = Array.isArray(details?.issues) ? (details.issues as Array<{ field?: unknown }>) : [];
+  return issues.flatMap((issue) => {
+    const index = typeof issue.field === 'string' ? /^attachmentIds\[(\d+)\]$/.exec(issue.field)?.[1] : undefined;
+    const id = index === undefined ? undefined : sentIds[Number(index)];
+    return id === undefined ? [] : [id];
+  });
+}

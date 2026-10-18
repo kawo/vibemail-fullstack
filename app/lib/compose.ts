@@ -54,7 +54,9 @@ export function validateForSend(fields: ComposeFields): FieldIssue[] {
 /** Maps `details.issues` from a `VALIDATION_FAILED` envelope onto the drawer's fields. */
 export function issuesFromDetails(details: Record<string, unknown> | undefined): FieldIssue[] {
   const raw = Array.isArray(details?.issues) ? (details.issues as Array<{ field?: unknown; message?: unknown }>) : [];
-  return raw.map((issue) => {
+  // Attachment issues mark their chips instead (see rejectedAttachmentIds).
+  const fieldIssues = raw.filter((issue) => !(typeof issue.field === 'string' && issue.field.startsWith('attachmentIds')));
+  return fieldIssues.map((issue) => {
     const name = typeof issue.field === 'string' ? issue.field.replace(/\[\d+\]$/, '') : 'body';
     const field = (['to', 'subject', 'body', 'threadId'] as const).find((f) => f === name) ?? 'body';
     return { field, message: typeof issue.message === 'string' ? issue.message : 'Invalid value' };

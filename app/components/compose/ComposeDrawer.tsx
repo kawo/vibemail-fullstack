@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { focusables, trapTarget } from '@/app/lib/focus';
-import { ApiError, api } from '@/app/services';
+import { ApiError, api, isAbort } from '@/app/services';
+import { uploadToStorage } from '@/app/services/upload';
+import {
+  type AttachmentChip,
+  addFiles,
+  attachmentIdsOf,
+  failAttachments,
+  rejectedAttachmentIds,
+  removeChip,
+  retryChip,
+  sendBlock,
+  settle,
+} from '@/app/lib/attachments';
 import type { DraftDTO, MessageDTO } from '@/app/services/types';
 import {
   type ComposeFields,
@@ -158,6 +170,12 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
   const [now, setNow] = useState(Date.now());
   const [expanded, setExpanded] = useState(false);
   const [edits, setEdits] = useState(0);
+  // v1.3 attachments (DESIGN_SPEC.md §3): chips in state; the File objects and in-flight uploads
+  // in refs, keyed by chip. Closing the drawer drops them all (attachments are not drafts).
+  const [attached, setAttached] = useState<AttachmentChip[]>([]);
+  const attachedFiles = useRef(new Map<string, File>());
+  const uploads = useRef(new Map<string, AbortController>());
+  const nextKey = useRef(0);
 
   const drawer = useRef<HTMLDivElement | null>(null);
   const toInput = useRef<HTMLInputElement | null>(null);
@@ -206,6 +224,77 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
       behind?.removeAttribute('inert');
     };
   }, [init.mode]);
+
+  // Cancel running uploads when the drawer goes away.
+  useEffect(() => {
+    const running = uploads.current;
+    return () => {
+      for (const controller of running.values()) {
+        controller.abort();
+      }
+      running.clear();
+    };
+  }, []);
+
+  /** Reserves the upload (§4.14), then sends the bytes to Storage; settles the chip either way. */
+  const startUpload = (key: string) => {
+    const file = attachedFiles.current.get(key);
+    if (!file) {
+      return;
+    }
+    uploads.current.get(key)?.abort();
+    const controller = new AbortController();
+    uploads.current.set(key, controller);
+    void (async () => {
+      try {
+        const { attachment, upload } = await api.reserveAttachment(
+          { filename: file.name, mimeType: file.type || 'application/octet-stream', size: file.size },
+          controller.signal,
+        );
+        await uploadToStorage(upload, file, controller.signal);
+        if (!controller.signal.aborted) {
+          setAttached((prev) => settle(prev, key, { attachmentId: attachment.attachmentId }));
+        }
+      } catch (error) {
+        if (controller.signal.aborted || isAbort(error)) {
+          return;
+        }
+        const tooLarge = error instanceof ApiError && error.code === 'FILE_TOO_LARGE';
+        setAttached((prev) => settle(prev, key, tooLarge ? 'too-large' : 'failed'));
+      } finally {
+        if (uploads.current.get(key) === controller) {
+          uploads.current.delete(key);
+        }
+      }
+    })();
+  };
+
+  const attachFiles = (files: File[]) => {
+    const next = addFiles(attached, files, () => `a${++nextKey.current}`);
+    const added = next.slice(attached.length);
+    added.forEach((chip, i) => {
+      const file = files[i];
+      if (file) {
+        attachedFiles.current.set(chip.key, file);
+      }
+    });
+    setAttached(next);
+    for (const chip of added.filter((c) => c.state === 'uploading')) {
+      startUpload(chip.key);
+    }
+  };
+
+  const removeAttachment = (key: string) => {
+    uploads.current.get(key)?.abort();
+    uploads.current.delete(key);
+    attachedFiles.current.delete(key);
+    setAttached((prev) => removeChip(prev, key));
+  };
+
+  const retryAttachment = (key: string) => {
+    setAttached((prev) => retryChip(prev, key));
+    startUpload(key);
+  };
 
   // Countdown tick while Send is rate-limited.
   useEffect(() => {
@@ -346,6 +435,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     setSending(true);
     setProblem(null);
     const sentDraftId = draftIdRef.current;
+    const attachmentIds = attachmentIdsOf(attached);
     const afterSent = (text: string) => {
       if (sentDraftId) {
         void deleteDraftQuietly(sentDraftId, false);
@@ -361,6 +451,7 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
         subject: current.subject,
         body: current.body,
         ...(current.threadId ? { threadId: current.threadId } : {}),
+        ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
       });
       // Cached, and placed in every loaded list it belongs to (All, as a sent message).
       store.upsert(message);
@@ -380,8 +471,17 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
           // Keep everything typed; the sign-in screen or reconnect panel takes over.
           saveUnsent(current);
           return;
-        case 'VALIDATION_FAILED':
+        case 'VALIDATION_FAILED': {
           setIssues(issuesFromDetails(apiError.details));
+          // Uploads the server rejected (unknown, or not stored yet) fail their chips, to be retried.
+          const rejected = rejectedAttachmentIds(apiError.details, attachmentIds);
+          if (rejected.length > 0) {
+            setAttached((prev) => failAttachments(prev, rejected));
+          }
+          return;
+        }
+        case 'FILE_TOO_LARGE':
+          setProblem({ kind: 'banner', text: 'These attachments are over 25 MB together', retry: false });
           return;
         case 'MESSAGE_NOT_FOUND':
           setProblem({ kind: 'thread-missing', then: 'send' });
@@ -434,7 +534,16 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
 
   const blockedFor = Math.max(0, Math.ceil((blockedUntil - now) / 1000));
   const current = fields();
-  const canSend = !sending && blockedFor === 0 && current.to.length > 0 && confirm === null;
+  const attachBlock = sendBlock(attached);
+  const canSend = !sending && blockedFor === 0 && current.to.length > 0 && confirm === null && attachBlock === null;
+  const attachHint =
+    attachBlock === 'uploading'
+      ? 'Uploading…'
+      : attachBlock === 'error'
+        ? 'Remove or retry the failed attachments'
+        : attachBlock === 'over-total'
+          ? 'Attachments are over 25 MB together'
+          : null;
   const issueFor = (field: FieldIssue['field']) => issues.filter((i) => i.field === field).map((i) => i.message).join(' ') || undefined;
 
   const saveStatus: SaveStatus | null = {
@@ -505,6 +614,8 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
     canSend,
     canSaveDraft: !sending && !isBlank(current) && saveState !== 'saving',
     expanded,
+    attachments: attached,
+    attachHint,
   };
 
   return (
@@ -542,6 +653,9 @@ export function ComposeDrawer({ onClose, ...opening }: ComposeDrawerProps) {
           onSend: () => void send(),
           onClose: close,
           onToggleExpand: () => setExpanded((v) => !v),
+          onAttachFiles: attachFiles,
+          onRemoveAttachment: removeAttachment,
+          onRetryAttachment: retryAttachment,
         }}
       />
     </>
