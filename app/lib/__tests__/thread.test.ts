@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyKind, gmailThreadUrl, initials, isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '@/app/lib/thread';
+import { bodyKind, bodyView, currentMessageId, gmailThreadUrl, hasHtmlBody, initials, isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '@/app/lib/thread';
 import { message } from '@/app/lib/__tests__/fixtures';
 
 describe('thread view helpers (DESIGN_SPEC.md §2)', () => {
@@ -77,6 +77,33 @@ describe('message body and Gmail link (DESIGN_SPEC.md §2)', () => {
     expect(bodyKind({ bodyPlain: '  \n', bodyHtml: '<p>x</p>' })).toBe('html');
     expect(bodyKind({ bodyPlain: '', bodyHtml: null })).toBe('snippet');
     expect(bodyKind({ bodyPlain: null, bodyHtml: '   ' })).toBe('snippet');
+  });
+
+  it('offers the HTML version only when the message has HTML', () => {
+    expect(hasHtmlBody({ bodyHtml: '<p>x</p>' })).toBe(true);
+    expect(hasHtmlBody({ bodyHtml: null })).toBe(false);
+    expect(hasHtmlBody({ bodyHtml: ' \n ' })).toBe(false);
+  });
+
+  it('renders the format the reader picked, falling back when that version is missing', () => {
+    const both = { bodyPlain: 'hi', bodyHtml: '<p>hi</p>' };
+    expect(bodyView(both, undefined)).toBe('plain');
+    expect(bodyView(both, 'plain')).toBe('plain');
+    expect(bodyView(both, 'html')).toBe('html');
+    // Picking plain on an HTML-only message shows its snippet; HTML can't be picked without HTML.
+    expect(bodyView({ bodyPlain: null, bodyHtml: '<p>x</p>' }, 'plain')).toBe('snippet');
+    expect(bodyView({ bodyPlain: 'hi', bodyHtml: null }, 'html')).toBe('plain');
+    // Unpicked, the §2 default applies: plain first, HTML only without plain text.
+    expect(bodyView({ bodyPlain: null, bodyHtml: '<p>x</p>' }, undefined)).toBe('html');
+  });
+
+  it('makes the most recently expanded card that is still open the current message', () => {
+    const ids = ['a', 'b', 'c'];
+    expect(currentMessageId(ids, new Set(['c']))).toBe('c');
+    expect(currentMessageId(ids, new Set(['c', 'a']))).toBe('a');
+    expect(currentMessageId(ids, new Set(['gone', 'b']))).toBe('b');
+    expect(currentMessageId(ids, new Set(['gone']))).toBeNull();
+    expect(currentMessageId(ids, new Set())).toBeNull();
   });
 
   it('links the thread to Gmail for the signed-in account', () => {

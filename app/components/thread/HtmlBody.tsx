@@ -16,10 +16,12 @@ export function HtmlBody({ html }: { html: string }) {
   const doc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>body{margin:12px;font:14px/22px system-ui,sans-serif;color:#111;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style></head><body>${clean}</body></html>`;
 
   // Measured on the frame's own load event, which can fire before any effect could subscribe.
+  // The <html> box includes the body's margins and any child margins that collapse through them,
+  // which body.scrollHeight misses (a leading <p> or <h2> would otherwise leave a scrollbar).
   const measure = () => {
-    const body = frame.current?.contentDocument?.body;
-    if (body) {
-      setHeight(Math.min(4000, body.scrollHeight + 24));
+    const root = frame.current?.contentDocument?.documentElement;
+    if (root) {
+      setHeight(Math.min(4000, Math.ceil(root.getBoundingClientRect().height)));
     }
   };
 

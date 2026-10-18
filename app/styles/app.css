@@ -1537,6 +1537,43 @@ mark {
   color: var(--danger-text);
 }
 
+/* The Plain | HTML switch: the settings segmented control, compact enough for the header. */
+.thread-head .body-format {
+  flex: none;
+}
+
+.thread-head .body-format label {
+  min-width: 44px;
+}
+
+/* Phones: six 44px buttons and the switch fit a 360px screen only without gaps or side padding;
+   each button still centres its icon in its own 44px box, and the segments shrink to their text. */
+@media (max-width: 479px) {
+  .thread-head {
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .thread-head .body-format label {
+    min-width: 0;
+  }
+}
+
+.segmented label.disabled {
+  color: var(--mute);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.segmented label.disabled:hover {
+  color: var(--mute);
+}
+
+.segmented label.disabled input {
+  cursor: not-allowed;
+}
+
 .thread-head .spinner {
   margin-right: var(--space-xs);
 }
@@ -2579,6 +2616,13 @@ mark {
    Standalone buttons grow to 44px. Small controls inside rows, cards and fields keep their
    visible size and gain an invisible hit area, centred on them, that grows to 44px. */
 @media (pointer: coarse) {
+  /* The header's Plain | HTML segments are 28px tall; tapping the label picks its radio. */
+  .thread-head .body-format label::after {
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+  }
+
   .thread-head .icon-btn,
   .thread-head .text-btn,
   .topbar .icon-btn,
