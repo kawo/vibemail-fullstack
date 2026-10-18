@@ -1,5 +1,5 @@
 import { SPLIT, useMediaQuery } from '@/app/lib/breakpoints';
-import { gmailThreadUrl } from '@/app/lib/thread';
+import { type BodyFormat, gmailThreadUrl } from '@/app/lib/thread';
 import { useAccountEmail } from '@/app/components/sidebar/useAccountEmail';
 import { Icon } from '@/app/components/icons';
 import { Glyph } from '@/app/components/ui';
@@ -7,7 +7,8 @@ import { Glyph } from '@/app/components/ui';
 /**
  * The thread view's sticky header (DESIGN_SPEC.md §2): back (or close, beside the list) on the
  * left; on the right: the read/unread toggle, the conversation star, a "View in Gmail" link (a new
- * tab, on the signed-in account), Archive and Move to trash, which becomes Restore (back to the inbox) for a conversation opened from Trash or
+ * tab, on the signed-in account), the Plain | HTML switch for the current message (disabled when no
+ * card is open; HTML disabled when that message has no HTML), Archive and Move to trash, which becomes Restore (back to the inbox) for a conversation opened from Trash or
  * wholly in it. Archive is disabled when nothing in the conversation is in the inbox. Each keeps its name as its accessible label and tooltip. The controls on the
  * right appear once the thread has loaded; back works at once. While an action runs, a spinner
  * leads them and they are disabled.
@@ -29,6 +30,8 @@ export function ThreadHeader({
     /** The last action restores the trashed messages instead of trashing. */
     restore: boolean;
     onTrash: () => void;
+    /** The current message's body format; null when no card is open. */
+    format: null | { value: BodyFormat; htmlAvailable: boolean; onChange: (format: BodyFormat) => void };
   };
   onBack: () => void;
 }) {
@@ -79,6 +82,33 @@ export function ThreadHeader({
           >
             <Icon name="external" />
           </a>
+          <div className="segmented body-format" role="radiogroup" aria-label="Message format">
+            {(['plain', 'html'] as const).map((value) => {
+              const format = controls.format;
+              const disabled = !format || (value === 'html' && !format.htmlAvailable);
+              const on = format?.value === value;
+              const title = !format
+                ? 'Open a message to choose its format'
+                : value === 'html'
+                  ? format.htmlAvailable
+                    ? 'Show the HTML version'
+                    : 'This message has no HTML version'
+                  : 'Show the plain-text version';
+              return (
+                <label key={value} className={[on && 'on', disabled && 'disabled'].filter(Boolean).join(' ') || undefined} title={title}>
+                  <input
+                    type="radio"
+                    name={`body-format-${threadId}`}
+                    value={value}
+                    checked={on}
+                    disabled={disabled}
+                    onChange={() => format?.onChange(value)}
+                  />
+                  {value === 'plain' ? 'Plain' : 'HTML'}
+                </label>
+              );
+            })}
+          </div>
           <button
             type="button"
             className="icon-btn"

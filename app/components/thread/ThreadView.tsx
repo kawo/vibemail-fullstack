@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react';
 import { type ApiError, api, isAbort } from '@/app/services';
 import type { MessageDTO } from '@/app/services/types';
-import { isThreadStarred, isThreadUnread, moveTargets, offersRestore, starTargets, threadSubject, unreadTargets } from '@/app/lib/thread';
+import {
+  type BodyFormat,
+  bodyView,
+  currentMessageId,
+  hasHtmlBody,
+  isThreadStarred,
+  isThreadUnread,
+  moveTargets,
+  offersRestore,
+  starTargets,
+  threadSubject,
+  unreadTargets,
+} from '@/app/lib/thread';
 import { INBOX_PATH, navigate } from '@/app/lib/router';
 import { changeLabels, markRead, markReadInBackground, markUnread, toggleStar } from '@/state/actions';
 import { useInboxUi } from '@/state/inboxUi';
@@ -15,7 +27,8 @@ import { ThreadSkeleton } from '@/app/components/thread/ThreadSkeleton';
  * The thread view (DESIGN_SPEC.md §2): `GET /api/v1/threads/{threadId}`, rendered oldest first in
  * the response's order. The newest message opens expanded (and is marked read); earlier ones are
  * collapsed. Every message is read from the shared cache, so stars and read state stay in step
- * with the inbox.
+ * with the inbox. The header's Plain | HTML switch picks the format per message, for the most
+ * recently expanded open card; the picks reset when another thread opens.
  */
 export function ThreadView({ threadId }: { threadId: string }) {
   const s = useStore();
@@ -23,7 +36,9 @@ export function ThreadView({ threadId }: { threadId: string }) {
   const [truncated, setTruncated] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<ApiError | null>(null);
+  // Insertion order is expansion order: the last open one is the current message.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [formats, setFormats] = useState<ReadonlyMap<string, BodyFormat>>(new Map());
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const { chip, searchActive } = useInboxUi();
@@ -31,6 +46,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     setState('loading');
+    setFormats(new Map());
     api
       .getThread(threadId, controller.signal)
       .then((thread) => {
@@ -55,6 +71,13 @@ export function ThreadView({ threadId }: { threadId: string }) {
 
   const messages = ids.map((id) => s.get(id)).filter((m): m is MessageDTO => m !== undefined);
   const newestId = messages[messages.length - 1]?.gmailId;
+  const currentId = currentMessageId(ids, expanded);
+  const current = currentId ? s.get(currentId) : undefined;
+  const pickFormat = (format: BodyFormat) => {
+    if (currentId) {
+      setFormats((prev) => new Map(prev).set(currentId, format));
+    }
+  };
   // While loading, show what the cache already knows about this thread.
   const cached = state === 'loading' ? s.all().find((m) => m.threadId === threadId) : undefined;
   const back = () => navigate(INBOX_PATH);
@@ -161,6 +184,13 @@ export function ThreadView({ threadId }: { threadId: string }) {
                 onArchive: () => void moveAll('archive'),
                 restore: restoring,
                 onTrash: () => void moveAll(restoring ? 'restore' : 'trash'),
+                format: current
+                  ? {
+                      value: bodyView(current, formats.get(current.gmailId)) === 'html' ? 'html' : 'plain',
+                      htmlAvailable: hasHtmlBody(current),
+                      onChange: pickFormat,
+                    }
+                  : null,
               }
             : null
         }
@@ -181,6 +211,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
               message={message}
               expanded={expanded.has(message.gmailId)}
               newest={message.gmailId === newestId}
+              format={formats.get(message.gmailId)}
               onToggle={() => toggle(message)}
             />
           ))}

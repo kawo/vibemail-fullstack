@@ -90,6 +90,37 @@ export function bodyKind(message: Pick<MessageDTO, 'bodyPlain' | 'bodyHtml'>): '
   return message.bodyHtml?.trim() ? 'html' : 'snippet';
 }
 
+/** The format a reader picks in the header's Plain | HTML switch. */
+export type BodyFormat = 'plain' | 'html';
+
+/** The HTML version can be picked only when there is some. */
+export function hasHtmlBody(message: Pick<MessageDTO, 'bodyHtml'>): boolean {
+  return Boolean(message.bodyHtml?.trim());
+}
+
+/**
+ * What an expanded card renders for the picked format. Unpicked, the `bodyKind` default applies.
+ * Plain shows `bodyPlain`, else the snippet; HTML falls back to plain when there is none.
+ */
+export function bodyView(message: Pick<MessageDTO, 'bodyPlain' | 'bodyHtml'>, format: BodyFormat | undefined): 'plain' | 'html' | 'snippet' {
+  if (format === undefined) {
+    return bodyKind(message);
+  }
+  if (format === 'html' && hasHtmlBody(message)) {
+    return 'html';
+  }
+  return message.bodyPlain?.trim() ? 'plain' : 'snippet';
+}
+
+/**
+ * The message the header's format switch acts on: the most recently expanded card that is still
+ * open (`expanded` keeps expansion order), or null when none is.
+ */
+export function currentMessageId(ids: readonly string[], expanded: ReadonlySet<string>): string | null {
+  const open = [...expanded].filter((id) => ids.includes(id));
+  return open[open.length - 1] ?? null;
+}
+
 /**
  * The conversation in Gmail's web app. Gmail accepts the API's thread ID in the `#all/` fragment;
  * `authuser` opens the signed-in account when the browser holds several Google accounts.
