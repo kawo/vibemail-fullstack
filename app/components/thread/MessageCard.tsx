@@ -1,9 +1,10 @@
 import type { MessageDTO } from '@/app/services/types';
 import { useCompose } from '@/app/components/compose/ComposeContext';
-import { displayName, formatSize } from '@/app/lib/format';
+import { displayName } from '@/app/lib/format';
 import { type BodyFormat, bodyView } from '@/app/lib/thread';
 import { MessageRow } from '@/app/components/MessageRow';
 import { toggleStar } from '@/state/actions';
+import { AttachmentList } from '@/app/components/thread/AttachmentList';
 import { HtmlBody } from '@/app/components/thread/HtmlBody';
 import { Glyph } from '@/app/components/ui';
 
@@ -50,16 +51,7 @@ export function MessageCard({
           ) : (
             <div className="body-plain">{kind === 'plain' ? message.bodyPlain : message.snippet}</div>
           )}
-          {message.attachments.length > 0 && (
-            <div className="attachments" aria-label="Attachments">
-              {message.attachments.map((a) => (
-                <span key={a.partId} className="attachment">
-                  <Glyph name="clip" className="sep" /> <b>{a.filename}</b> <span className="sep">·</span> {a.mimeType}{' '}
-                  <span className="sep">·</span> {formatSize(a.size)}
-                </span>
-              ))}
-            </div>
-          )}
+          <AttachmentList message={message} />
           <div className="card-actions">
             <button type="button" className={newest ? 'primary-btn sm' : 'secondary-btn'} onClick={() => compose.open({ reply: message })}>
               Reply

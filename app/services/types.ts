@@ -115,6 +115,15 @@ export interface AttachmentUploadRequest {
   size: number;
 }
 
+/** §4.15 `200` response: a short-lived signed URL that saves the file under `filename`. */
+export interface AttachmentDownloadResponse {
+  url: string;
+  expiresAt: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 /** §4.14 `201` response. */
 export interface AttachmentUploadResponse {
   attachment: { attachmentId: string; filename: string; mimeType: string; size: number; createdAt: string };

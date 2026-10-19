@@ -1790,10 +1790,28 @@ mark {
 }
 
 .attachment {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
   color: var(--mute);
+  font: inherit;
   font-size: calc(12px * var(--text-scale, 1));
   line-height: calc(16px * var(--text-scale, 1));
+  text-align: left;
   overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+/* Each entry downloads its file (CONTRACT.md §4.15): the name underlines on hover. */
+.attachment:hover b,
+.attachment:focus-visible b {
+  text-decoration: underline;
+}
+
+.attachment[aria-busy='true'] {
+  cursor: progress;
 }
 
 .attachment b {
@@ -2715,6 +2733,11 @@ mark {
    Standalone buttons grow to 44px. Small controls inside rows, cards and fields keep their
    visible size and gain an invisible hit area, centred on them, that grows to 44px. */
 @media (pointer: coarse) {
+  /* A message's attachment downloads are a stacked list: each grows to 44px tall. */
+  .attachments .attachment {
+    min-height: 44px;
+  }
+
   /* Compose attachments: the footer paperclip grows to 44px; a chip's remove and Retry keep their
      visible size and gain a 44px-tall invisible hit area. */
   .compose-footer .icon-btn {
