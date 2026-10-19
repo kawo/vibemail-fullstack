@@ -202,6 +202,13 @@ export interface MailProvider {
   /** Changes since `since` (incremental sync). Rejects with `cursor_expired` when `since` is too old. */
   listChanges(since: SyncCursor, pageToken?: string): Promise<ChangePage>;
 
+  /**
+   * One attachment's bytes, by MIME part ID (CONTRACT.md §4.15). Gmail's attachment ID is looked
+   * up fresh from the message, since it isn't stable. Rejects with `not_found` when the message or
+   * the part is gone.
+   */
+  getAttachment(messageId: string, partId: string): Promise<Buffer>;
+
   /** Sends a message (CONTRACT.md §4.3). */
   sendMessage(message: OutgoingMessage): Promise<{ id: string; threadId: string }>;
 

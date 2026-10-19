@@ -28,7 +28,7 @@ import {
   watchInbox,
 } from './auth';
 import { google, type gmail_v1 } from 'googleapis';
-import { parseGmailMessage } from './messages';
+import { parseGmailMessage, walk } from './messages';
 import { buildRfc2822, toRaw } from './mime';
 
 export const GMAIL_INBOX_LABEL = 'INBOX';
@@ -130,6 +130,33 @@ export class GmailMailProvider implements MailProvider {
       this.gmail.users.messages.get({ userId: 'me', id, format: 'full' }),
     );
     return parseGmailMessage(data);
+  }
+
+  async getAttachment(messageId: string, partId: string): Promise<Buffer> {
+    const { data: message } = await this.call('messages.get', () =>
+      this.gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' }),
+    );
+    let part: gmail_v1.Schema$MessagePart | undefined;
+    for (const candidate of walk(message.payload ?? undefined)) {
+      if (candidate.partId === partId) {
+        part = candidate;
+        break;
+      }
+    }
+    if (part?.body?.data) {
+      return Buffer.from(part.body.data, 'base64url');
+    }
+    const attachmentId = part?.body?.attachmentId;
+    if (!attachmentId) {
+      throw new ProviderError('not_found', `part ${partId} of message ${messageId} not found`);
+    }
+    const { data } = await this.call('messages.attachments.get', () =>
+      this.gmail.users.messages.attachments.get({ userId: 'me', messageId, id: attachmentId }),
+    );
+    if (typeof data.data !== 'string') {
+      throw new ProviderError('upstream', 'messages.attachments.get response lacks data');
+    }
+    return Buffer.from(data.data, 'base64url');
   }
 
   /** One page of `history.list` since `since`. A 404 means the cursor is too old: `cursor_expired`. */

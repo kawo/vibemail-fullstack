@@ -36,6 +36,8 @@ export interface FakeMailbox {
   /** Gmail drafts by draft ID. */
   drafts: Map<string, { message: OutgoingMessage; messageId: string; threadId: string; updatedAt?: Date }>;
   calls: FakeCall[];
+  /** Attachment bytes by `${messageId}/${partId}` (CONTRACT.md §4.15). */
+  attachmentBytes: Map<string, Buffer>;
   /** Scripted failures: the next call to the method rejects with this error, then the entry is removed. */
   failNext: Map<keyof MailProvider, ProviderError>;
   /** When true, any provider call rejects. Used to assert "makes zero provider calls". */
@@ -50,6 +52,7 @@ export function createFakeMailbox(): FakeMailbox {
     currentCursor: cursor(1),
     sent: [],
     drafts: new Map(),
+    attachmentBytes: new Map(),
     calls: [],
     failNext: new Map(),
     forbidCalls: false,
@@ -140,6 +143,15 @@ class FakeMailProvider implements MailProvider {
       throw new ProviderError('not_found', `message ${id} not found`);
     }
     return message;
+  }
+
+  async getAttachment(messageId: string, partId: string): Promise<Buffer> {
+    this.record('getAttachment', [messageId, partId]);
+    const bytes = this.box.attachmentBytes.get(`${messageId}/${partId}`);
+    if (!bytes) {
+      throw new ProviderError('not_found', `part ${partId} of message ${messageId} not found`);
+    }
+    return bytes;
   }
 
   async listChanges(since: SyncCursor, pageToken?: string): Promise<ChangePage> {
