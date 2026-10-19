@@ -57,6 +57,16 @@ describe('httpSource (CONTRACT.md §3.1, §4)', () => {
     expect(result.attachment.attachmentId).toBe('a1');
   });
 
+  it('asks for an attachment download link by message and part (§4.15)', async () => {
+    fetchMock.mockResolvedValue(json(200, { url: 'https://storage.test/x', expiresAt: '', filename: 'a.pdf', mimeType: 'application/pdf', size: 3 }));
+    const result = await httpSource.downloadAttachment('m1', '0.1');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/messages/m1/attachments/0.1');
+    expect(init.method).toBe('GET');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer tok');
+    expect(result.url).toBe('https://storage.test/x');
+  });
+
   it('sends attachmentIds with the message (§4.3)', async () => {
     fetchMock.mockResolvedValue(json(201, { message: {} }));
     await httpSource.send({ to: ['a@b.c'], subject: 's', body: 'b', attachmentIds: ['a1', 'a2'] });

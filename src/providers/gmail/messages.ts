@@ -55,7 +55,7 @@ export function decodeBase64Url(data: string | null | undefined): string | null 
 }
 
 /** Depth-first walk over the MIME tree, root included. */
-function* walk(part: Part | undefined): Generator<Part> {
+export function* walk(part: Part | undefined): Generator<Part> {
   if (!part) {
     return;
   }

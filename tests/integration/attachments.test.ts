@@ -59,6 +59,26 @@ describe('attachment store', () => {
     expect(object?.contentType).toMatch(/^text\/plain/);
   });
 
+  it('stores bytes and signs a download URL that saves the file under its name (§4.15)', async () => {
+    const owner = await createTestUser();
+    const path = `${owner.userId}/received/m1/1`;
+    paths.push(path);
+    await store().put(path, Buffer.from('%PDF data'), 'application/pdf');
+    await store().put(path, Buffer.from('%PDF data v2'), 'application/pdf'); // a second copy replaces it
+    const signed = await store().createDownloadUrl(path, 'résumé "final".pdf');
+    expect(signed).not.toBeNull();
+    expect(signed?.expiresAt.getTime()).toBeGreaterThan(Date.now() + 4 * 60_000);
+    const response = await fetch(signed?.url ?? '');
+    expect(response.ok).toBe(true);
+    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('%PDF data v2');
+    expect(response.headers.get('content-disposition')).toMatch(/^attachment/);
+  });
+
+  it('signs no download URL for a missing object', async () => {
+    const owner = await createTestUser();
+    await expect(store().createDownloadUrl(`${owner.userId}/received/none/1`, 'x.txt')).resolves.toBeNull();
+  });
+
   it('reads a missing object as null', async () => {
     const owner = await createTestUser();
     await expect(store().read(`${owner.userId}/${randomUUID()}`)).resolves.toBeNull();

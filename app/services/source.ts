@@ -1,4 +1,5 @@
 import type {
+  AttachmentDownloadResponse,
   AttachmentUploadRequest,
   AttachmentUploadResponse,
   DraftDTO,
@@ -42,4 +43,6 @@ export interface DataSource {
   deleteDraft(draftId: string): Promise<undefined>;
   /** §4.14 `POST /api/v1/attachments` (*v1.3*): reserve an upload; `uploadToStorage` sends the file. */
   reserveAttachment(request: AttachmentUploadRequest, signal?: AbortSignal): Promise<AttachmentUploadResponse>;
+  /** §4.15 `GET /api/v1/messages/{id}/attachments/{partId}` (*v1.3*): a signed download URL. */
+  downloadAttachment(gmailId: string, partId: string): Promise<AttachmentDownloadResponse>;
 }

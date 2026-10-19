@@ -2,6 +2,7 @@ import { currentSession, refreshSession, signOut } from '@/app/lib/auth/session'
 import { ApiError, emitApiSignal } from './errors';
 import type { DataSource } from './source';
 import type {
+  AttachmentDownloadResponse,
   AttachmentUploadRequest,
   AttachmentUploadResponse,
   DraftDTO,
@@ -130,6 +131,12 @@ export const httpSource: DataSource = {
 
   deleteDraft: (draftId: string) =>
     call<undefined>('DELETE', `/api/v1/drafts/${encodeURIComponent(draftId)}`, { quietReconnect: true }),
+
+  downloadAttachment: (gmailId: string, partId: string) =>
+    call<AttachmentDownloadResponse>(
+      'GET',
+      `/api/v1/messages/${encodeURIComponent(gmailId)}/attachments/${encodeURIComponent(partId)}`,
+    ),
 
   reserveAttachment: (request: AttachmentUploadRequest, signal?: AbortSignal) =>
     call<AttachmentUploadResponse>('POST', '/api/v1/attachments', { body: request, ...(signal ? { signal } : {}) }),

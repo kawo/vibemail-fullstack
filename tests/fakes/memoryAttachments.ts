@@ -1,5 +1,5 @@
 import type { AttachmentRow, AttachmentsRepository, NewAttachment } from '../../src/db/attachments';
-import type { AttachmentStore, SignedUpload, StoredObject } from '../../src/storage/attachments';
+import type { AttachmentStore, SignedDownload, SignedUpload, StoredObject } from '../../src/storage/attachments';
 
 /** In-memory `attachments` table (CONTRACT.md §5.5), scoped by user like the real one. */
 export class MemoryAttachments implements AttachmentsRepository {
@@ -42,5 +42,19 @@ export class MemoryAttachmentStore implements AttachmentStore {
 
   async read(path: string): Promise<StoredObject | null> {
     return this.objects.get(path) ?? null;
+  }
+
+  puts: string[] = [];
+
+  async put(path: string, content: Buffer, contentType: string): Promise<void> {
+    this.puts.push(path);
+    this.objects.set(path, { content, contentType });
+  }
+
+  async createDownloadUrl(path: string, filename: string): Promise<SignedDownload | null> {
+    if (!this.objects.has(path)) {
+      return null;
+    }
+    return { url: `https://storage.test/object/sign/attachments/${path}?download=${encodeURIComponent(filename)}`, expiresAt: new Date('2026-10-19T10:05:00.000Z') };
   }
 }

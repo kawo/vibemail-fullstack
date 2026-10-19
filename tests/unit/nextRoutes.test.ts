@@ -32,7 +32,7 @@ describe('Next.js route re-exports of the engine', () => {
   // so routes run another route's handler (docs/deploy-routing-issue.md).
   it('keeps no top-level api/ folder', () => expect(existsSync(path.join(ROOT, 'api'))).toBe(false));
 
-  it('finds every engine handler', () => expect(apiFiles).toHaveLength(13));
+  it('finds every engine handler', () => expect(apiFiles).toHaveLength(14));
 
   it.each(apiFiles.map((f) => [path.relative(ROOT, f).replace(/\\/g, '/'), f]))('%s has a matching route', async (_name, apiFile) => {
     const handler = (await import(apiFile)) as Record<string, unknown>;

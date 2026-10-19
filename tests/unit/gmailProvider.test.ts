@@ -302,3 +302,37 @@ describe('GmailMailProvider.listDrafts (CONTRACT.md §4.13)', () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe('GmailMailProvider.getAttachment (CONTRACT.md §4.15)', () => {
+  const pdf = Buffer.from('%PDF-1.7 bytes');
+  const message = (parts: unknown[]) => ({
+    data: { id: 'm1', threadId: 't1', historyId: '9', internalDate: '0', payload: { mimeType: 'multipart/mixed', parts } },
+  });
+
+  it("looks the part's attachment ID up fresh, then fetches and decodes the bytes", async () => {
+    const { provider, calls } = providerWith((options) =>
+      options.url.includes('/attachments/')
+        ? { data: { data: pdf.toString('base64url'), size: pdf.length } }
+        : message([
+            { partId: '0', mimeType: 'text/plain', body: { data: 'aGk' } },
+            { partId: '1', filename: 'a.pdf', mimeType: 'application/pdf', body: { attachmentId: 'FRESH-ID', size: pdf.length } },
+          ]),
+    );
+    await expect(provider.getAttachment('m1', '1')).resolves.toEqual(pdf);
+    expect(calls[0]?.url).toContain('/gmail/v1/users/me/messages/m1');
+    expect(calls[1]?.url).toContain('/gmail/v1/users/me/messages/m1/attachments/FRESH-ID');
+  });
+
+  it('uses inline part data without a second request', async () => {
+    const { provider, calls } = providerWith(() =>
+      message([{ partId: '0', mimeType: 'multipart/alternative', parts: [{ partId: '0.1', filename: 'n.txt', body: { data: Buffer.from('note').toString('base64url') } }] }]),
+    );
+    await expect(provider.getAttachment('m1', '0.1')).resolves.toEqual(Buffer.from('note'));
+    expect(calls).toHaveLength(1);
+  });
+
+  it('rejects with not_found when the part is gone', async () => {
+    const { provider } = providerWith(() => message([{ partId: '1', filename: 'a.pdf', body: { attachmentId: 'X' } }]));
+    await expect(provider.getAttachment('m1', '2')).rejects.toMatchObject({ kind: 'not_found' });
+  });
+});

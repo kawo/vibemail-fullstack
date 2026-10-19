@@ -5,11 +5,18 @@ export const ATTACHMENTS_BUCKET = 'attachments';
 
 /** Supabase's signed upload URLs are valid for a fixed 2 hours. */
 const SIGNED_UPLOAD_TTL_MS = 2 * 60 * 60 * 1000;
+/** Download links (CONTRACT.md §4.15) live 5 minutes. */
+export const DOWNLOAD_TTL_SECONDS = 300;
 
 export interface SignedUpload {
   url: string;
   /** Exactly the headers the browser must send with its PUT. Never a VibeMail or service token. */
   headers: Record<string, string>;
+  expiresAt: Date;
+}
+
+export interface SignedDownload {
+  url: string;
   expiresAt: Date;
 }
 
@@ -24,6 +31,10 @@ export interface AttachmentStore {
   createUploadUrl(path: string, contentType: string): Promise<SignedUpload>;
   /** Null when no object exists at `path` (reserved but not uploaded yet). */
   read(path: string): Promise<StoredObject | null>;
+  /** Writes (or replaces) an object; used for downloaded copies of message attachments (§4.15). */
+  put(path: string, content: Buffer, contentType: string): Promise<void>;
+  /** A short-lived URL that saves the object as `filename`; null when no object exists at `path`. */
+  createDownloadUrl(path: string, filename: string): Promise<SignedDownload | null>;
 }
 
 export class StorageError extends Error {
@@ -65,6 +76,24 @@ export function createAttachmentStore(client: SupabaseClient, now: () => Date = 
         throw new StorageError('download', error);
       }
       return { content: Buffer.from(await data.arrayBuffer()), contentType: data.type };
+    },
+
+    async put(path, content, contentType) {
+      const { error } = await bucket().upload(path, content, { contentType, upsert: true });
+      if (error) {
+        throw new StorageError('upload', error);
+      }
+    },
+
+    async createDownloadUrl(path, filename) {
+      const { data, error } = await bucket().createSignedUrl(path, DOWNLOAD_TTL_SECONDS, { download: filename });
+      if (error || !data) {
+        if (isNotFound(error)) {
+          return null;
+        }
+        throw new StorageError('createSignedUrl', error);
+      }
+      return { url: data.signedUrl, expiresAt: new Date(now().getTime() + DOWNLOAD_TTL_SECONDS * 1000) };
     },
   };
 }
