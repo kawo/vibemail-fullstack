@@ -172,7 +172,9 @@ Primary endpoint: `GET /api/v1/threads/{threadId}` (§4.8, *v1.1*). It also uses
   - **Expanded card header:** `fromAddress`, `toAddress`, `ccAddresses` (when non-empty) and `internalDate`.
   - **Expanded card body:** plain text by default, with the header's Plain | HTML switch to change it; see **Message body** below.
 - **Status badges.** A card whose `status` is `trash`, `spam` or `archived` shows a small badge with that value. A card whose `status` is `sent` is aligned to the right.
-- **Attachments.** Each entry in `attachments` is listed by `filename`, `mimeType` and `size`. The list is informational only: the contract has no attachment download endpoint.
+- **Attachments.** Each entry in `attachments` is a button showing `filename`, `mimeType` and `size`, labelled "Download {filename}" (*v1.3*). Tapping it calls `GET /api/v1/messages/{gmailId}/attachments/{partId}` (CONTRACT.md §4.15) and sends the browser to the returned `url`, which saves the file under its name. While that request runs, the entry shows a spinner and is `aria-busy`, and further taps on it are ignored.
+  - `FILE_TOO_LARGE`: a toast "{filename} is too large to download here. Use View in Gmail."
+  - Any other failure: a toast "Couldn't download {filename}". `UNAUTHENTICATED` and the Gmail connection codes follow the shared rules.
 - **Truncated threads.** When `truncated` is `true`, a frosted banner above the first card reads "Earlier messages in this conversation aren't available in VibeMail".
 
 ### Message body
@@ -194,7 +196,7 @@ How an expanded card renders its message, and the two header controls that relat
   - Links open in a new tab (`<base target="_blank">` and the popup permissions).
   - A Content-Security-Policy blocks every remote resource. Remote images stay hidden behind a "Remote images are hidden. Show images" notice until the user allows them for that message; inline (`data:`, `cid:`) images always show.
   - The frame is sized to its content (the height of its `<html>` box), up to 4000px, so it shows no inner scrollbar.
-- **View in Gmail.** A header link (`external` icon, labelled and titled "View in Gmail") that opens the conversation in Gmail's web app in a new tab: `https://mail.google.com/mail/?authuser={account email}#all/{threadId}`, with `rel="noopener noreferrer"`. `authuser` picks the signed-in account when the browser holds several Google accounts; without a known email the parameter is left out. It is for anything VibeMail doesn't show, such as attachments, which have no download endpoint.
+- **View in Gmail.** A header link (`external` icon, labelled and titled "View in Gmail") that opens the conversation in Gmail's web app in a new tab: `https://mail.google.com/mail/?authuser={account email}#all/{threadId}`, with `rel="noopener noreferrer"`. `authuser` picks the signed-in account when the browser holds several Google accounts; without a known email the parameter is left out. It is for anything VibeMail doesn't show, such as an attachment over 25 MB.
 
 ### User actions
 

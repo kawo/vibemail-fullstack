@@ -3,7 +3,7 @@
 > Status: **v1, binding.** Any change to an endpoint, error code, or stored field is made in this file first (see §7).
 > **v1.1 additions** (marked *Added in v1.1*) support the VibeMail Glass frontend (`docs/design-system/DESIGN_SPEC.md`): message `status`, label updates, thread view, search and drafts (including the draft list, §4.13). They are implemented, with the §5.1 `status` migration and their tests.
 > **v1.2 change** (marked *Changed in v1.2*): `GET /api/v1/messages` filters by `label` on the server (§4.2), so the frontend no longer filters loaded messages itself. Bearer verification also accepts tokens signed with the Supabase project's asymmetric signing keys (§3.1).
-> **v1.3 addition** (marked *Added in v1.3*): attachments, implemented with the §5.5 migration and their tests. `POST /api/v1/attachments` (§4.14) reserves an upload, which goes from the browser straight to Supabase Storage through a signed URL; `POST /api/v1/messages/send` takes `attachmentIds` (§4.3). New table and Storage bucket (§5.5) and a new error code, `FILE_TOO_LARGE` (§3.3).
+> **v1.3 addition** (marked *Added in v1.3*): attachments, implemented with the §5.5 migration and their tests. `POST /api/v1/attachments` (§4.14) reserves an upload, which goes from the browser straight to Supabase Storage through a signed URL; `POST /api/v1/messages/send` takes `attachmentIds` (§4.3); `GET /api/v1/messages/{id}/attachments/{partId}` downloads a stored message's attachment through a signed Storage URL (§4.15). New table and Storage bucket (§5.5) and a new error code, `FILE_TOO_LARGE` (§3.3).
 > Stack: Vercel Functions (Node.js runtime); the handlers live in `src/endpoints/` (never a top-level `api/` folder, which Vercel would build as separate functions) and, *changed in v1.2*, are served through Next.js route files that re-export them, so the frontend and every endpoint share one project and origin · TypeScript · Supabase (Postgres + Auth) · `googleapis` (Gmail API v1).
 
 ---
@@ -29,12 +29,13 @@ The VibeMail Engine is the backend that connects a user's Gmail account, mirrors
   - creating, updating and deleting Gmail drafts (§4.10–§4.12);
   - listing the user's Gmail drafts, read from Gmail on request (§4.13).
   - Filtering by label happens in the client, on `status`, `isStarred` and `labelIds`; there is no filter endpoint.
-- *Added in v1.3:* uploading an attachment of up to 25 MB, reserved by the API and stored in Supabase Storage (§4.14), and sending a message with uploaded attachments, up to 25 MB together (§4.3).
+- *Added in v1.3:* uploading an attachment of up to 25 MB, reserved by the API and stored in Supabase Storage (§4.14), and sending a message with uploaded attachments, up to 25 MB together (§4.3);
+  - downloading one attachment of a stored message, up to 25 MB, read from Gmail on request (§4.15).
 
 **Out of scope (v1)**
 
 - Attachments on drafts: a draft carries text only, even when the message being written has attachments. Stored attachment *metadata* on received mail is in scope.
-- Downloading attachments, uploaded or received, and cleaning up unused uploads.
+- Downloading attachments over 25 MB (§4.15), downloading an upload back, and cleaning up Storage objects.
 - File uploads through a function: Vercel Functions take at most 4.5 MB of request body, so files go to Storage directly (§4.14).
 - Server-side label/unread filters.
 - Scheduled jobs other than watch renewal. In particular, there is no scheduled or request-triggered sync: Gmail is read only at connect time and on push. The thread view and search read the DB only, so they see only stored messages.
@@ -1016,8 +1017,59 @@ interface AttachmentUploadResponse {
 
 - **No clean-up.** Reservations that are never uploaded, and uploads that are never used, are kept. Removing them needs a scheduled job, which is out of scope (§1). Deleting a user removes their `attachments` rows (FK cascade), but **not** their Storage objects, which have no foreign key; those stay until removed by hand under `{user_id}/`.
 - **No quota.** There is no per-user limit on the number or total size of uploads.
-- **No download.** There is no endpoint to read an upload back, and no endpoint for attachments of received mail (§4.8 lists their metadata only).
+- **No download of uploads.** There is no endpoint to read an upload back. Once sent, a file can be downloaded from the sent message like any attachment (§4.15).
 - **Kept after sending.** Sending (§4.3) leaves the row and the object in place.
+
+---
+
+### 4.15 Download an attachment — `GET /api/v1/messages/{id}/attachments/{partId}` (*Added in v1.3*)
+
+Returns a short-lived signed URL that downloads one attachment of a stored message, received or sent. Like the draft list (§4.13), it reads Gmail **on request**: only when the user asks for that file, never on a timer. Function file: `src/endpoints/v1/messages/[id]/attachments/[partId].ts`, served by `app/api/v1/messages/[id]/attachments/[partId]/route.ts`.
+
+**Why a URL and not the file.** Vercel Functions return at most 4.5 MB of response body, and Gmail attachments go up to 25 MB here. So the engine copies the file into the private Storage bucket (§5.5) and hands the browser a signed URL to fetch it from Storage directly.
+
+**Request:** path parameters only.
+
+- `id`: the message's `gmailId` (letters and digits).
+- `partId`: the attachment's `partId` from `MessageDTO.attachments` (§3.4), digits and dots, e.g. `1` or `0.2`.
+
+**Behavior**
+
+1. Authenticate (§3.1). Validate `id` and `partId` (`VALIDATION_FAILED`, issue on that field).
+2. Load the stored message for this user (`user_id` filter, §5.3). No row, or no entry in its `attachments` with that `partId` → `MESSAGE_NOT_FOUND` with `details: { partId }` when the message exists. No Gmail call.
+3. An entry whose `size` is over 26,214,400 bytes → `FILE_TOO_LARGE` with `details: { maxBytes: 26214400, size }`. Gmail accepts incoming mail up to 50 MB, but the bucket holds at most 25 MB per object. No Gmail call.
+4. The copy lives at `{user_id}/received/{gmailId}/{partId}` in the `attachments` bucket. If it is already there, skip to step 6.
+5. Read the file from Gmail: `users.messages.get({ id, format: 'full' })`, find the part with that `partId`, then `users.messages.attachments.get({ messageId: id, id: <the part's current body.attachmentId> })`. The attachment ID is looked up fresh because Gmail does not keep it stable between fetches. A part with its data inline (`body.data`) uses that instead. Store the decoded bytes at the path above with the entry's `mimeType`.
+   - Gmail answers 404, or the part is gone → `MESSAGE_NOT_FOUND` (`details: { partId }`).
+6. Create a signed download URL for that object, valid for **5 minutes**, that makes the browser save it under the entry's `filename` (`Content-Disposition: attachment`).
+
+**Response — `200 OK`**
+
+```ts
+interface AttachmentDownloadResponse {
+  url: string;        // signed Supabase Storage URL; GET it within expiresAt
+  expiresAt: string;  // ISO 8601, 5 minutes after the response
+  filename: string;
+  mimeType: string;
+  size: number;       // from the stored metadata
+}
+```
+
+**Errors**
+
+| Code | HTTP | Trigger |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Missing or invalid bearer token. |
+| `VALIDATION_FAILED` | 400 | `id` or `partId` is malformed (`details.issues`). |
+| `MESSAGE_NOT_FOUND` | 404 | No such stored message for this user, no such attachment on it, or Gmail no longer has it. |
+| `FILE_TOO_LARGE` | 413 | The attachment is over 25 MB (`details: { maxBytes, size }`). The client points to View in Gmail. |
+| `GMAIL_NOT_CONNECTED` | 409 | No `users` row or refresh token (only when Gmail has to be read). |
+| `GMAIL_TOKEN_REVOKED` | 401 | `invalid_grant`. |
+| `GMAIL_RATE_LIMITED` | 429 | Gmail rate limit. |
+| `GMAIL_UPSTREAM_ERROR` | 502 | Gmail 5xx or an unexpected 4xx. |
+| `INTERNAL` | 500 | A DB or Storage error, or an unexpected exception. |
+
+**Known limits:** the Storage copy is kept after the download, so a later download of the same file reads no Gmail; like uploads, copies are never cleaned up and are not removed when the user is deleted (§4.14). The signed URL works for anyone holding it until it expires.
 
 ---
 
@@ -1106,7 +1158,7 @@ Every query runs as the service role, so RLS does not protect user data. The rul
 - Exactly two functions may query without a `user_id` filter, and their names say so:
   - `findAccountByEmailUnscoped(email)`, for the webhook (§4.5);
   - `listConnectedAccountsUnscoped({ watchExpiringBefore })`, for the cron job (§4.6).
-- *Added in v1.3:* every Storage object path starts with the owner's `user_id` (`{user_id}/{attachmentId}`), built only from the token's `sub` and a server-generated ID, never from client input such as `filename`. Signed URLs are created for one path at a time.
+- *Added in v1.3:* every Storage object path starts with the owner's `user_id`, built only from the token's `sub` and server-side values, never from client input such as `filename`: `{user_id}/{attachmentId}` for uploads (a server-generated ID), and `{user_id}/received/{gmailId}/{partId}` for downloaded copies (§4.15; both taken from the user's own stored row after validation). Signed URLs are created for one path at a time.
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only and never logged or returned.
 
 ### 5.4 Token encryption
@@ -1141,6 +1193,7 @@ One row per reservation from §4.14. The file itself lives in Supabase Storage, 
 - Private (`public = false`): no public URLs, and the anon and authenticated roles get no Storage policies. Uploads use the signed URLs from §4.14; any later read goes through the service role.
 - `file_size_limit = 26214400` (25 MB). Storage rejects a larger upload whatever `size` was declared.
 - No `allowed_mime_types` restriction.
+- *§4.15:* downloaded copies of message attachments live under `{user_id}/received/{gmailId}/{partId}`, with no row in `attachments`.
 - Objects are **not** removed when the user or the row is deleted (§4.14, Known limits).
 
 ---

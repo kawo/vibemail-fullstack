@@ -81,7 +81,7 @@ With the Supabase GitHub integration, merging into `main` runs the migration on 
 ## Never-do rules
 
 - **Never use `any`** as a TypeScript type.
-- **Never poll the Gmail API for new messages.** Use Pub/Sub push webhooks. Gmail is read only by the initial full sync at connect time and by the webhook (CONTRACT.md §3.5). `GET /api/v1/messages` reads the DB only.
+- **Never poll the Gmail API for new messages.** Use Pub/Sub push webhooks. Gmail is read only by the initial full sync at connect time and by the webhook (CONTRACT.md §3.5). `GET /api/v1/messages` reads the DB only. The only on-request reads are the draft list (§4.13) and an attachment download the user asked for (§4.15).
 - **Never store OAuth tokens in plaintext.** `refresh_token` and `access_token` are encrypted with AES-256-GCM using `ENCRYPTION_KEY`, in `src/db/` only (CONTRACT.md §5.4).
 - **Never make Gmail API calls without the `googleapis` `OAuth2` client.** It handles token refresh automatically. Its `'tokens'` listener persists `access_token` and `access_token_expires_at` as a pair; a missing `expiry_date` makes the library treat a token as never-expiring.
 - **Never write to `src/db/` from the schema session.**
